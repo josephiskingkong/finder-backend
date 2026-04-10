@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ПОЛЬЗОВАТЕЛИ ====================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  firstName     String?  @map("first_name")
+  lastName      String?  @map("last_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  entrepreneurProfile EntrepreneurProfile?
+  businesses          Business[]
+  refreshTokens       RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ==================== ПРОФИЛЬ ПРЕДПРИНИМАТЕЛЯ ====================
+
+enum EntrepreneurType {
+  DOMAIN_EXPERT      // Разбирается в предметной области, но не в бизнесе
+  COMPLETE_BEGINNER   // Не разбирается ни в бизнесе, ни в предметной области
+  UNKNOWN            // Ещё не определён
+}
+
+model EntrepreneurProfile {
+  id                  String           @id @default(uuid())
+  userId              String           @unique @map("user_id")
+  type                EntrepreneurType @default(UNKNOWN)
+  experienceYears     Int?             @map("experience_years")
+  industryKnowledge   String?          @map("industry_knowledge")
+  hasExistingBusiness Boolean          @default(false) @map("has_existing_business")
+  motivationNotes     String?          @map("motivation_notes")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("entrepreneur_profiles")
+}
+
+// ==================== БИЗНЕС-ПРОЕКТ ====================
+
+enum BusinessStatus {
+  IDEA_GENERATION
+  IDEA_DEFINED
+  ANALYSIS
+  VALIDATION
+  MVP
+  ITERATION
+  LAUNCHED
+}
+
+model Business {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  title       String
+  description String?
+  industry    String?
+  status      BusinessStatus @default(IDEA_GENERATION)
+
+  problemStatement  String?  @map("problem_statement")
+  targetAudience    String?  @map("target_audience")
+  uniqueValue       String?  @map("unique_value")
+  competitors       String?
+  monetizationModel String?  @map("monetization_model")
+  marketSize        String?  @map("market_size")
+  hypotheses        String?
+  interviewResults  String?  @map("interview_results")
+  mvpDescription    String?  @map("mvp_description")
+
+  inn        String?
+  ogrn       String?
+  legalForm  String?  @map("legal_form")
+  taxSystem  String?  @map("tax_system")
+  okvedCodes String?  @map("okved_codes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roadmap  Roadmap?
+  chats    Conversation[]
+  files    Attachment[]
+
+  @@map("businesses")
+}
+
+// ==================== РОАДМАП ====================
+
+enum RoadmapPhase {
+  PROBLEMATIZATION
+  PRODUCT_STUDY
+  MARKET_ANALYSIS
+  MONETIZATION
+  USER_INTERVIEWS
+  MVP_CREATION
+  REPEAT_CUSTDEV
+  REGISTRATION
+  ACCOUNTING
+}
+
+model Roadmap {
+  id         String   @id @default(uuid())
+  businessId String   @unique @map("business_id")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  steps    RoadmapStep[]
+
+  @@map("roadmaps")
+}
+
+enum StepStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  FAILED
+}
+
+model RoadmapStep {
+  id          String       @id @default(uuid())
+  roadmapId   String       @map("roadmap_id")
+  phase       RoadmapPhase
+  order       Int
+  title       String
+  description String
+  tips        String?
+  status      StepStatus   @default(LOCKED)
+
+  userReport   String?   @map("user_report")
+  userFeedback String?   @map("user_feedback")
+  aiAnalysis   String?   @map("ai_analysis")
+  completedAt  DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  roadmap     Roadmap          @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  attachments StepAttachment[]
+
+  @@map("roadmap_steps")
+}
+
+// ==================== ЧАТ ====================
+
+model Conversation {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  title      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("conversations")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  role           MessageRole
+  content        String
+  metadata       String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// ==================== ФАЙЛЫ ====================
+
+model Attachment {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  filename   String
+  mimetype   String
+  size       Int
+  path       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stepAttachments StepAttachment[]
+
+  @@map("attachments")
+}
+
+model StepAttachment {
+  id           String @id @default(uuid())
+  stepId       String @map("step_id")
+  attachmentId String @map("attachment_id")
+
+  step       RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  attachment Attachment  @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([stepId, attachmentId])
+  @@map("step_attachments")
+}
