@@ -1,27 +1,63 @@
 .auth-page {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100dvh;
-  background: var(--gray-50);
-  padding: 24px;
+  width: 100%;
+  background: var(--black);
+  padding: 32px 24px;
+  position: relative;
+  overflow: hidden;
+  gap: 0;
+}
+
+.auth-bg-texture {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 30px,
+      rgba(59, 94, 254, .03) 30px,
+      rgba(59, 94, 254, .03) 31px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 30px,
+      rgba(59, 94, 254, .03) 30px,
+      rgba(59, 94, 254, .03) 31px
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-glow {
+  display: none;
+}
+
+.auth-logo-top {
+  font-family: 'Georgia', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  margin-bottom: 32px;
+  z-index: 1;
+  text-transform: uppercase;
 }
 
 .auth-card {
   width: 100%;
   max-width: 400px;
-  background: var(--white);
+  background: var(--surface-card);
   border-radius: var(--radius);
-  border: 1px solid var(--gray-200);
-  padding: 40px 32px;
-  box-shadow: var(--shadow);
-}
-
-.auth-logo {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-  color: var(--accent);
+  border: 1px solid var(--surface-border);
+  padding: 36px 28px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1;
 }
 
 .auth-title {
@@ -30,12 +66,13 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 4px;
+  color: var(--text-primary);
 }
 
 .auth-subtitle {
   text-align: center;
   font-size: 14px;
-  color: var(--gray-500);
+  color: var(--text-secondary);
   margin-bottom: 28px;
 }
 
@@ -56,26 +93,130 @@
   margin-top: 4px;
   font-size: 15px;
 }
+/* Убираем «свечение» вокруг кнопки входа (наследовалось от .btn-primary:hover). */
+.auth-btn.btn-primary:hover {
+  box-shadow: none;
+}
 
 .auth-error {
-  background: #fef2f2;
+  background: rgba(239, 68, 68, .12);
   color: var(--danger);
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   font-size: 13px;
-  border: 1px solid #fecaca;
+  border: 1px solid rgba(239, 68, 68, .25);
 }
 
 .auth-footer {
   text-align: center;
   margin-top: 20px;
+  gap: 12px;
   font-size: 13px;
-  color: var(--gray-500);
+  color: var(--text-secondary);
+  z-index: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
 }
 
 .auth-footer a {
   color: var(--accent);
   font-weight: 500;
+  border: 1px solid var(--surface-border);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  transition: all var(--transition);
+}
+
+.auth-footer a:hover {
+  background: var(--surface-card);
+  border-color: var(--accent);
+}
+
+/* ===== QUIZ ===== */
+.quiz-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--surface-border);
+  padding: 36px 32px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.quiz-step-badge {
+  background: var(--accent);
+  color: var(--white);
+  padding: 6px 20px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.quiz-question {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  margin-bottom: 28px;
+  line-height: 1.4;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--gray-100);
+  color: var(--text-primary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+}
+
+.quiz-option:hover {
+  border-color: var(--gray-300);
+  background: var(--gray-200);
+}
+
+.quiz-option.selected {
+  border-color: var(--accent);
+  background: rgba(59, 94, 254, .1);
+}
+
+.quiz-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.quiz-option.selected .quiz-option-icon {
+  color: var(--accent);
+}
+
+.quiz-next-btn {
+  padding: 12px 32px;
+  font-size: 15px;
+  border-radius: 12px;
 }
 
 /* ===== АДАПТИВ ===== */
@@ -89,8 +230,10 @@
   .auth-title {
     font-size: 20px;
   }
-}
-
-.auth-footer a:hover {
-  text-decoration: underline;
+  .quiz-card {
+    padding: 24px 16px;
+  }
+  .quiz-question {
+    font-size: 18px;
+  }
 }

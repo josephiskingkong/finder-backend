@@ -4,11 +4,15 @@ import { ZodSchema, ZodError } from 'zod';
 export class AppError extends Error {
   public statusCode: number;
   public isOperational: boolean;
+  /// Дополнительные структурированные данные, которые фронт может использовать,
+  /// например время сброса лимита, код причины и т.п.
+  public meta?: Record<string, unknown>;
 
-  constructor(message: string, statusCode: number) {
+  constructor(message: string, statusCode: number, meta?: Record<string, unknown>) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = true;
+    this.meta = meta;
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -18,6 +22,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return res.status(err.statusCode).json({
       success: false,
       error: err.message,
+      ...(err.meta ? { meta: err.meta } : {}),
     });
   }
 

@@ -30,3 +30,9 @@ export async function deleteConversationHandler(req: Request, res: Response) {
   await chatService.deleteConversation(req.user!.userId, req.params.conversationId as string);
   sendSuccess(res, { message: 'Беседа удалена' });
 }
+
+export async function createConversationHandler(req: Request, res: Response) {
+  const { businessId, title } = req.body;
+  const conversation = await chatService.createConversation(req.user!.userId, businessId as string, title as string | undefined);
+  sendSuccess(res, conversation);
+}

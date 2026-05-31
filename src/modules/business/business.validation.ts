@@ -21,7 +21,6 @@ export const updateBusinessSchema = z.object({
   marketSize: z.string().optional(),
   hypotheses: z.string().optional(),
   interviewResults: z.string().optional(),
-  mvpDescription: z.string().optional(),
   inn: z.string().optional(),
   ogrn: z.string().optional(),
   legalForm: z.string().optional(),

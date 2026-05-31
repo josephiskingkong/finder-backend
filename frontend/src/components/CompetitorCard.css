@@ -1,0 +1,228 @@
+/* ── CompetitorCard — inline chat message ── */
+
+.cc-wrap {
+  background: var(--surface-card, rgba(255,255,255,.04));
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md, 10px);
+  overflow: hidden;
+  font-size: 13px;
+  max-width: 560px;
+  width: 100%;
+}
+
+/* Header */
+.cc-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--surface-border);
+  background: rgba(59, 94, 254, .07);
+}
+
+.cc-header-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(59, 94, 254, .18);
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cc-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: .01em;
+}
+
+.cc-header-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cc-tier-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(129, 140, 248, .15);
+  color: #818cf8;
+  text-transform: uppercase;
+}
+
+/* States */
+.cc-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.cc-state svg { flex-shrink: 0; margin-top: 1px; }
+
+.cc-state-error { color: var(--danger, #f87171); }
+
+.cc-spin { animation: ccSpin 1s linear infinite; }
+@keyframes ccSpin { to { transform: rotate(360deg); } }
+
+/* Card list */
+.cc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--surface-border);
+}
+
+.cc-card {
+  background: var(--surface, #111);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: background .15s;
+}
+
+.cc-card:hover {
+  background: rgba(255,255,255,.025);
+}
+
+.cc-card-row { display: flex; align-items: center; gap: 6px; }
+
+.cc-card-top {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cc-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+  flex: 1;
+}
+
+.cc-card-name-link {
+  text-decoration: none;
+  color: inherit;
+  transition: color .15s;
+}
+
+.cc-card-name-link:hover {
+  color: #818cf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Status badges */
+.cc-status {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cc-status-active {
+  background: rgba(34, 197, 94, .12);
+  color: #4ade80;
+}
+
+.cc-status-inactive {
+  background: rgba(239, 68, 68, .1);
+  color: #f87171;
+}
+
+/* Meta chips */
+.cc-card-meta {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cc-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.cc-meta-okved {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  color: #818cf8;
+  background: rgba(129, 140, 248, .08);
+  border-color: rgba(129, 140, 248, .15);
+}
+
+/* Full name (smaller, secondary) */
+.cc-card-fullname {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  margin-top: -2px;
+}
+
+/* Detail rows (director, address, okved, capital) */
+.cc-card-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  gap: 5px;
+  line-height: 1.35;
+}
+
+.cc-card-detail svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.cc-card-legal {
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+/* Financials row */
+.cc-card-fin {
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  margin-top: 1px;
+}
+
+/* Footer */
+.cc-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--surface-border);
+  opacity: 0.55;
+}

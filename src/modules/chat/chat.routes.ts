@@ -19,4 +19,7 @@ router.get('/conversations/:conversationId/messages', asyncHandler(chatControlle
 // Удалить беседу
 router.delete('/conversations/:conversationId', asyncHandler(chatController.deleteConversationHandler));
 
+// Создать новую беседу
+router.post('/conversations', asyncHandler(chatController.createConversationHandler));
+
 export default router;

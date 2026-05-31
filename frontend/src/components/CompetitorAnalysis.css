@@ -1,0 +1,200 @@
+/* ── Competitor Analysis Panel (compact sidebar) ── */
+
+.ca-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--surface-border);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* Header */
+.ca-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.ca-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ca-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ca-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.ca-icon-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, .06);
+}
+
+/* Body — scrollable */
+.ca-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+/* States: loading / error / empty */
+.ca-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+
+.ca-state svg { flex-shrink: 0; margin-top: 1px; }
+
+.ca-state-error {
+  color: var(--danger, #f87171);
+}
+
+.ca-retry {
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: auto;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.ca-retry:hover { opacity: 0.75; }
+
+/* Spin animation */
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Count label */
+.ca-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+/* Card list */
+.ca-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ca-card {
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ca-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ca-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ca-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ca-badge.active {
+  background: rgba(34, 197, 94, .12);
+  color: #4ade80;
+}
+
+.ca-badge.inactive {
+  background: rgba(239, 68, 68, .12);
+  color: #f87171;
+}
+
+.ca-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ca-mono {
+  font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.ca-card-addr {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ca-card-fin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-top: 2px;
+  border-top: 1px solid var(--surface-border);
+  margin-top: 2px;
+}
+
+/* Footer */
+.ca-footer {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--surface-border);
+  flex-shrink: 0;
+  opacity: 0.6;
+}

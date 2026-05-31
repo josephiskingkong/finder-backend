@@ -1,11 +1,10 @@
-Напimport { ReactElement } from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import ReactMarkdown from 'react-markdown'
 import {
-  Lock, CircleDot, Play, CheckCircle2,
-  AlertTriangle, Loader2, Send, ChevronDown, ChevronUp
+  Play, CheckCircle2,
+  AlertTriangle, Loader2, Send, X, Clock, Check
 } from 'lucide-react'
 import './Roadmap.css'
 
@@ -43,50 +42,30 @@ const phaseLabels: Record<string, string> = {
   ACCOUNTING: 'Бухгалтерия',
 }
 
-const statusIcons: Record<string, ReactElement> = {
-  LOCKED: <Lock size={18} />,
-  AVAILABLE: <CircleDot size={18} />,
-  IN_PROGRESS: <Play size={18} />,
-  COMPLETED: <CheckCircle2 size={18} />,
-  FAILED: <AlertTriangle size={18} />,
-  SKIPPED: <CheckCircle2 size={18} />,
-}
-
-/** Превращает сплошной текст с «Шаг N:» / «N.» в Markdown с переносами */
 function formatStepText(text: string): string {
   return text
-    // "Шаг 1:" / "Шаг 2:" → на новую строку с жирным заголовком
     .replace(/(?<!\n)\s*Шаг\s+(\d+)\s*[:\.]\s*/gi, '\n\n**Шаг $1.** ')
-    // "1. " / "2. " в начале или после точки/пробела → нумерованный список
     .replace(/(?<!\n)(?<=[\.\!\?])\s+(\d+)\.\s+/g, '\n\n$1. ')
     .trim()
 }
 
 export default function RoadmapPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const businessId = searchParams.get('businessId') || ''
 
   const [businesses, setBusinesses] = useState<BusinessItem[]>([])
-  const [showProjectPicker, setShowProjectPicker] = useState(false)
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [expandedStep, setExpandedStep] = useState<string | null>(null)
+  const [selectedStep, setSelectedStep] = useState<RoadmapStep | null>(null)
   const [reportText, setReportText] = useState('')
   const [reportSuccess, setReportSuccess] = useState(true)
   const [reporting, setReporting] = useState(false)
   const [starting, setStarting] = useState<string | null>(null)
 
-  const currentProject = businesses.find(b => b.id === businessId)
-
   useEffect(() => {
     api.get<BusinessItem[]>('/businesses').then(setBusinesses).catch(() => {})
   }, [])
-
-  const selectProject = (id: string) => {
-    setSearchParams({ businessId: id })
-    setShowProjectPicker(false)
-  }
 
   useEffect(() => {
     if (!businessId) return
@@ -111,9 +90,7 @@ export default function RoadmapPage() {
     try {
       const data = await api.post<Roadmap>(`/roadmap/generate`, { businessId })
       setRoadmap(data)
-    } catch {
-      // ошибка
-    } finally {
+    } catch {} finally {
       setGenerating(false)
     }
   }
@@ -123,9 +100,7 @@ export default function RoadmapPage() {
     try {
       await api.patch(`/roadmap/steps/${stepId}/start`)
       await loadRoadmap()
-    } catch {
-      // ошибка
-    } finally {
+    } catch {} finally {
       setStarting(null)
     }
   }
@@ -144,50 +119,17 @@ export default function RoadmapPage() {
       } else {
         await loadRoadmap()
       }
-      // авто-раскрываем шаг чтобы пользователь сразу увидел анализ ИИ
-      setExpandedStep(stepId)
-    } catch {
-      // ошибка
-    } finally {
+    } catch {} finally {
       setReporting(false)
     }
   }
 
-  const completedCount = roadmap?.steps.filter(s => s.status === 'COMPLETED').length || 0
-  const totalCount = roadmap?.steps.length || 0
-  const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-
   if (!businessId) {
     return (
       <div className="roadmap-page">
-        <div className="roadmap-project-picker">
-          <div className="project-picker-wrapper">
-            <button className="project-picker-btn" onClick={() => setShowProjectPicker(p => !p)}>
-              <span>Выберите проект</span>
-              <ChevronDown size={14} />
-            </button>
-            {showProjectPicker && (
-              <div className="project-picker-dropdown">
-                {businesses.length === 0 ? (
-                  <div className="picker-empty">Нет проектов</div>
-                ) : (
-                  businesses.map(b => (
-                    <button
-                      key={b.id}
-                      className={`picker-item ${b.id === businessId ? 'active' : ''}`}
-                      onClick={() => selectProject(b.id)}
-                    >
-                      {b.title}
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </div>
         <div className="roadmap-empty">
           <h2>Выберите проект</h2>
-          <p>Выберите бизнес-проект выше, чтобы увидеть дорожную карту</p>
+          <p>Выберите бизнес-проект в боковой панели, чтобы увидеть дорожную карту</p>
         </div>
       </div>
     )
@@ -203,182 +145,257 @@ export default function RoadmapPage() {
 
   if (!roadmap) {
     return (
-      <div className="roadmap-empty">
-        <h2>Дорожная карта</h2>
-        <p>У этого проекта ещё нет дорожной карты. Сгенерируйте персональный план для вашего бизнеса.</p>
-        <button
-          className="btn btn-primary"
-          onClick={handleGenerate}
-          disabled={generating}
-        >
-          {generating ? (
-            <><Loader2 size={16} className="spin" /> Генерация...</>
-          ) : (
-            'Сгенерировать дорожную карту'
-          )}
-        </button>
+      <div className="roadmap-page">
+        <div className="roadmap-empty">
+          <h2>Дорожная карта</h2>
+          <p>У этого проекта ещё нет дорожной карты. Сгенерируйте персональный план.</p>
+          <button
+            className="btn btn-primary"
+            onClick={handleGenerate}
+            disabled={generating}
+          >
+            {generating ? (
+              <><Loader2 size={16} className="spin" /> Генерация...</>
+            ) : (
+              'Сгенерировать дорожную карту'
+            )}
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="roadmap-page">
-      <div className="roadmap-header">
-        <div className="roadmap-header-top">
-          <h1>Дорожная карта</h1>
-          <div className="project-picker-wrapper">
-            <button className="project-picker-btn" onClick={() => setShowProjectPicker(p => !p)}>
-              <span>{currentProject?.title || 'Выберите проект'}</span>
-              <ChevronDown size={14} />
+      {/* Panel overlay when step is selected */}
+      {selectedStep && (
+        <div className="roadmap-panel-overlay" onClick={() => setSelectedStep(null)}>
+          <div className="roadmap-panel" onClick={e => e.stopPropagation()}>
+            <button className="roadmap-panel-close" onClick={() => setSelectedStep(null)}>
+              <X size={20} />
             </button>
-            {showProjectPicker && (
-              <div className="project-picker-dropdown">
-                {businesses.map(b => (
-                  <button
-                    key={b.id}
-                    className={`picker-item ${b.id === businessId ? 'active' : ''}`}
-                    onClick={() => selectProject(b.id)}
-                  >
-                    {b.title}
-                  </button>
-                ))}
+            <h2 className="roadmap-panel-title">Этапы плана</h2>
+            <div className="roadmap-panel-content">
+              <h3>{selectedStep.title}</h3>
+              <div className="panel-description">
+                <ReactMarkdown>{formatStepText(selectedStep.description)}</ReactMarkdown>
               </div>
-            )}
-          </div>
-        </div>
-        <div className="roadmap-progress">
-          <div className="progress-info">
-            <span>{completedCount} из {totalCount} шагов</span>
-            <span className="progress-pct">{progressPct}%</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${progressPct}%` }} />
-          </div>
-        </div>
-      </div>
-
-      <div className="steps-timeline">
-        {roadmap.steps.map((step, idx) => {
-          const isExpanded = expandedStep === step.id
-          const canStart = step.status === 'AVAILABLE'
-          const canReport = step.status === 'IN_PROGRESS'
-          const isLocked = step.status === 'LOCKED'
-
-          return (
-            <div
-              key={step.id}
-              className={`step-card status-${step.status.toLowerCase()}`}
-            >
-              {/* Линия таймлайна */}
-              {idx < roadmap.steps.length - 1 && (
-                <div className={`timeline-line ${step.status === 'COMPLETED' ? 'done' : ''}`} />
-              )}
-
-              <div className="step-marker">
-                <div className={`step-icon status-${step.status.toLowerCase()}`}>
-                  {statusIcons[step.status]}
+              {selectedStep.tips && (
+                <div className="panel-tips">
+                  <strong>💡 Советы:</strong>
+                  <ReactMarkdown>{formatStepText(selectedStep.tips)}</ReactMarkdown>
                 </div>
-              </div>
-
-              <div className="step-body">
+              )}
+              {selectedStep.aiAnalysis && (
+                <div className="panel-analysis">
+                  <strong>Анализ ИИ:</strong>
+                  <ReactMarkdown>{selectedStep.aiAnalysis}</ReactMarkdown>
+                </div>
+              )}
+              {selectedStep.userReport && (
+                <div className="panel-report">
+                  <strong>Ваш отчёт:</strong>
+                  <p>{selectedStep.userReport}</p>
+                </div>
+              )}
+              {selectedStep.status === 'AVAILABLE' && (
                 <button
-                  className="step-header"
-                  onClick={() => !isLocked && setExpandedStep(isExpanded ? null : step.id)}
-                  disabled={isLocked}
+                  className="btn btn-primary"
+                  onClick={() => handleStart(selectedStep.id)}
+                  disabled={starting === selectedStep.id}
                 >
-                  <div className="step-title-block">
-                    <span className="step-phase">{phaseLabels[step.phase] || step.phase}</span>
-                    <h3 className="step-title">{step.title}</h3>
-                  </div>
-                  {!isLocked && (
-                    isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />
+                  {starting === selectedStep.id ? (
+                    <><Loader2 size={14} className="spin" /> Запуск...</>
+                  ) : (
+                    <><Play size={14} /> Начать этап</>
                   )}
                 </button>
-
-                {isExpanded && (
-                  <div className="step-details">
-                    <div className="step-description">
-                      <ReactMarkdown>{formatStepText(step.description)}</ReactMarkdown>
-                    </div>
-
-                    {step.tips && (
-                      <div className="step-tips">
-                        <strong>💡 Советы:</strong>
-                        <ReactMarkdown>{formatStepText(step.tips)}</ReactMarkdown>
-                      </div>
-                    )}
-
-                    {step.aiAnalysis && (
-                      <div className="ai-analysis">
-                        <strong>Анализ ИИ:</strong>
-                        <ReactMarkdown>{step.aiAnalysis}</ReactMarkdown>
-                      </div>
-                    )}
-
-                    {step.userReport && (
-                      <div className="user-report">
-                        <strong>Ваш отчёт:</strong>
-                        <p>{step.userReport}</p>
-                      </div>
-                    )}
-
-                    {canStart && (
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => handleStart(step.id)}
-                        disabled={starting === step.id}
-                      >
-                        {starting === step.id ? (
-                          <><Loader2 size={14} className="spin" /> Запуск...</>
-                        ) : (
-                          <><Play size={14} /> Начать этап</>
-                        )}
-                      </button>
-                    )}
-
-                    {canReport && (
-                      <div className="report-form">
-                        <div className="report-toggle">
-                          <button
-                            className={`toggle-btn ${reportSuccess ? 'active' : ''}`}
-                            onClick={() => setReportSuccess(true)}
-                          >
-                            <CheckCircle2 size={14} /> Успешно
-                          </button>
-                          <button
-                            className={`toggle-btn ${!reportSuccess ? 'active fail' : ''}`}
-                            onClick={() => setReportSuccess(false)}
-                          >
-                            <AlertTriangle size={14} /> Не получилось
-                          </button>
-                        </div>
-                        <textarea
-                          className="report-textarea"
-                          value={reportText}
-                          onChange={e => setReportText(e.target.value)}
-                          placeholder="Расскажите, что вы сделали и какой получили результат..."
-                          rows={3}
-                        />
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => handleReport(step.id)}
-                          disabled={reporting || !reportText.trim()}
-                        >
-                          {reporting ? (
-                            <><Loader2 size={14} className="spin" /> Отправка...</>
-                          ) : (
-                            <><Send size={14} /> Отправить отчёт</>
-                          )}
-                        </button>
-                      </div>
-                    )}
+              )}
+              {selectedStep.status === 'IN_PROGRESS' && (
+                <div className="report-form">
+                  <div className="report-toggle">
+                    <button
+                      className={`toggle-btn ${reportSuccess ? 'active' : ''}`}
+                      onClick={() => setReportSuccess(true)}
+                    >
+                      <CheckCircle2 size={14} /> Успешно
+                    </button>
+                    <button
+                      className={`toggle-btn ${!reportSuccess ? 'active fail' : ''}`}
+                      onClick={() => setReportSuccess(false)}
+                    >
+                      <AlertTriangle size={14} /> Не получилось
+                    </button>
                   </div>
+                  <textarea
+                    className="report-textarea"
+                    value={reportText}
+                    onChange={e => setReportText(e.target.value)}
+                    placeholder="Расскажите, что вы сделали..."
+                    rows={3}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => handleReport(selectedStep.id)}
+                    disabled={reporting || !reportText.trim()}
+                  >
+                    {reporting ? (
+                      <><Loader2 size={14} className="spin" /> Отправка...</>
+                    ) : (
+                      <><Send size={14} /> Отправить отчёт</>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <h1 className="roadmap-title">Этапы плана</h1>
+
+      {/* Organic zigzag bubble map with curved connectors */}
+      <RoadmapMap
+        steps={roadmap.steps}
+        phaseLabels={phaseLabels}
+        onSelect={s => s.status !== 'LOCKED' && setSelectedStep(s)}
+      />
+    </div>
+  )
+}
+
+// === Organic hand-drawn map with zigzag bubbles and curved dashed connectors ===
+function RoadmapMap({
+  steps,
+  phaseLabels,
+  onSelect,
+}: {
+  steps: RoadmapStep[]
+  phaseLabels: Record<string, string>
+  onSelect: (step: RoadmapStep) => void
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const bubbleRefs = useRef<(HTMLDivElement | null)[]>([])
+  const [paths, setPaths] = useState<string[]>([])
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
+  useLayoutEffect(() => {
+    const recalc = () => {
+      const container = containerRef.current
+      if (!container) return
+      const cRect = container.getBoundingClientRect()
+      setSize({ w: cRect.width, h: cRect.height })
+
+      const newPaths: string[] = []
+      for (let i = 0; i < bubbleRefs.current.length - 1; i++) {
+        const a = bubbleRefs.current[i]
+        const b = bubbleRefs.current[i + 1]
+        if (!a || !b) continue
+        const ar = a.getBoundingClientRect()
+        const br = b.getBoundingClientRect()
+        // Exit from bottom-center of A, enter top-center of B
+        const x1 = ar.left + ar.width / 2 - cRect.left
+        const y1 = ar.bottom - cRect.top
+        const x2 = br.left + br.width / 2 - cRect.left
+        const y2 = br.top - cRect.top
+
+        // Determine which side to loop OUT on: opposite of where the next bubble sits
+        // If next bubble is to the right of current → loop OUT to the right (past it)
+        // If next is to the left → loop OUT to the left.
+        const goingRight = x2 >= x1
+        const loopSide = goingRight ? 1 : -1
+        const containerWidth = cRect.width
+        // Swing extends far beyond the bubble centers to create a true "loop" / teardrop
+        const swing = Math.min(containerWidth * 0.55, 220)
+        const cp1x = x1 + swing * loopSide
+        const cp1y = y1 + (y2 - y1) * 0.15
+        const cp2x = x2 + swing * loopSide
+        const cp2y = y2 - (y2 - y1) * 0.15
+        newPaths.push(`M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`)
+      }
+      setPaths(newPaths)
+    }
+    recalc()
+    const ro = new ResizeObserver(recalc)
+    if (containerRef.current) ro.observe(containerRef.current)
+    window.addEventListener('resize', recalc)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recalc)
+    }
+  }, [steps.length])
+
+  return (
+    <div className="rmap" ref={containerRef}>
+      <svg className="rmap-svg" width={size.w} height={size.h} viewBox={`0 0 ${size.w} ${size.h}`}>
+        {paths.map((d, i) => (
+          <path
+            key={i}
+            d={d}
+            fill="none"
+            stroke="rgba(255,255,255,0.35)"
+            strokeWidth="1.6"
+            strokeDasharray="5 5"
+            strokeLinecap="round"
+          />
+        ))}
+      </svg>
+
+      <div className="rmap-list">
+        {steps.map((step, idx) => {
+          const isCompleted = step.status === 'COMPLETED'
+          const isInProgress = step.status === 'IN_PROGRESS'
+          const isLocked = step.status === 'LOCKED'
+          const align = idx % 2 === 0 ? 'left' : 'right'
+          const label = phaseLabels[step.phase] || step.title
+
+          return (
+            <div key={step.id} className={`rmap-row align-${align}`}>
+              <DashedBubble
+                ref={el => { bubbleRefs.current[idx] = el }}
+                status={step.status.toLowerCase() as any}
+                onClick={() => onSelect(step)}
+              >
+                <span className="rmap-label">{label}</span>
+                {isCompleted && (
+                  <span className="rmap-badge badge-check" aria-hidden>
+                    <Check size={12} strokeWidth={3} />
+                  </span>
                 )}
-              </div>
+                {isInProgress && (
+                  <span className="rmap-badge badge-clock" aria-hidden>
+                    <Clock size={12} />
+                  </span>
+                )}
+                {isLocked && <span className="rmap-lock-dot" aria-hidden />}
+              </DashedBubble>
             </div>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// Wrapper that passes ref properly and adds data attribute for styling
+const DashedBubble = ({
+  children,
+  status,
+  onClick,
+  ref: forwardRef,
+}: {
+  children: React.ReactNode
+  status: 'completed' | 'in_progress' | 'available' | 'locked' | 'failed' | 'skipped'
+  onClick: () => void
+  ref?: React.Ref<HTMLDivElement>
+}) => {
+  return (
+    <div
+      ref={forwardRef}
+      className={`rmap-bubble status-${status}`}
+      onClick={onClick}
+    >
+      {children}
     </div>
   )
 }

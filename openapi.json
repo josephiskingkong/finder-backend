@@ -1,0 +1,1311 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Finder API",
+    "description": "API для управления бизнес-проектами, ИИ-чатом, роадмапами и администрирования",
+    "version": "1.0.0",
+    "contact": {
+      "email": "support@finder.ru"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001/api",
+      "description": "Local development server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT access token"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string", "nullable": true },
+          "lastName": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["USER", "ADMIN"], "default": "USER" },
+          "subscription": { "type": "string", "enum": ["FREE", "PLUS", "PREMIUM"], "default": "FREE" },
+          "subscriptionUntil": { "type": "string", "format": "date-time", "nullable": true },
+          "isBlocked": { "type": "boolean", "default": false },
+          "entrepreneurProfile": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "type": { "type": "string", "enum": ["DOMAIN_EXPERT", "COMPLETE_BEGINNER", "UNKNOWN"] },
+              "industryKnowledge": { "type": "string", "nullable": true }
+            }
+          }
+        }
+      },
+      "Business": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "industry": { "type": "string", "nullable": true },
+          "status": { 
+            "type": "string", 
+            "enum": ["IDEA_GENERATION", "IDEA_DEFINED", "ANALYSIS", "VALIDATION", "MVP", "ITERATION", "LAUNCHED"],
+            "default": "IDEA_GENERATION"
+          },
+          "problemStatement": { "type": "string", "nullable": true },
+          "targetAudience": { "type": "string", "nullable": true },
+          "uniqueValue": { "type": "string", "nullable": true },
+          "competitors": { "type": "string", "nullable": true },
+          "monetizationModel": { "type": "string", "nullable": true },
+          "marketSize": { "type": "string", "nullable": true },
+          "hypotheses": { "type": "string", "nullable": true },
+          "interviewResults": { "type": "string", "nullable": true },
+          "mvpDescription": { "type": "string", "nullable": true },
+          "inn": { "type": "string", "nullable": true },
+          "ogrn": { "type": "string", "nullable": true },
+          "legalForm": { "type": "string", "nullable": true },
+          "taxSystem": { "type": "string", "nullable": true },
+          "okvedCodes": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "businessId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "nullable": true },
+          "aiTier": { "type": "string", "enum": ["PREMIUM", "PLUS"], "default": "PREMIUM" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "conversationId": { "type": "string", "format": "uuid" },
+          "role": { "type": "string", "enum": ["USER", "ASSISTANT", "SYSTEM"] },
+          "content": { "type": "string" },
+          "metadata": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Roadmap": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "businessId": { "type": "string", "format": "uuid" },
+          "version": { "type": "integer", "default": 1 },
+          "steps": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RoadmapStep" }
+          }
+        }
+      },
+      "RoadmapStep": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "roadmapId": { "type": "string", "format": "uuid" },
+          "phase": { 
+            "type": "string", 
+            "enum": ["PROBLEMATIZATION", "PRODUCT_STUDY", "MARKET_ANALYSIS", "MONETIZATION", "USER_INTERVIEWS", "MVP_CREATION", "REPEAT_CUSTDEV", "REGISTRATION", "ACCOUNTING"]
+          },
+          "order": { "type": "integer" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "tips": { "type": "string", "nullable": true },
+          "status": { 
+            "type": "string", 
+            "enum": ["LOCKED", "AVAILABLE", "IN_PROGRESS", "COMPLETED", "SKIPPED", "FAILED"],
+            "default": "LOCKED"
+          },
+          "userReport": { "type": "string", "nullable": true },
+          "userFeedback": { "type": "string", "nullable": true },
+          "aiAnalysis": { "type": "string", "nullable": true },
+          "completedAt": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "FnsCompany": {
+        "type": "object",
+        "properties": {
+          "inn": { "type": "string" },
+          "ogrn": { "type": "string", "nullable": true },
+          "name": { "type": "string" },
+          "fullName": { "type": "string", "nullable": true },
+          "okved": { "type": "string", "nullable": true },
+          "address": { "type": "string", "nullable": true },
+          "status": { "type": "string", "nullable": true },
+          "management": { "type": "string", "nullable": true }
+        }
+      },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "businessId": { "type": "string", "format": "uuid" },
+          "filename": { "type": "string" },
+          "mimetype": { "type": "string" },
+          "size": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PlanConfig": {
+        "type": "object",
+        "properties": {
+          "plan": { "type": "string", "enum": ["FREE", "PLUS", "PREMIUM"] },
+          "messagesPerWindow": { "type": "integer" },
+          "windowHours": { "type": "integer" },
+          "label": { "type": "string" },
+          "description": { "type": "string", "nullable": true }
+        }
+      },
+      "AIModelTier": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "enum": ["PLUS", "PREMIUM"] },
+          "name": { "type": "string" },
+          "provider": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "default": false },
+          "error": { "type": "string" },
+          "meta": { "type": "object", "nullable": true }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "default": true },
+          "data": {},
+          "meta": { "type": "object", "nullable": true }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Регистрация нового пользователя",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 },
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Пользователь успешно зарегистрирован",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": { "$ref": "#/components/schemas/User" },
+                        "accessToken": { "type": "string" },
+                        "refreshToken": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Авторизация пользователя",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": { "$ref": "#/components/schemas/User" },
+                        "accessToken": { "type": "string" },
+                        "refreshToken": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Обновление access token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Токены обновлены",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": { "type": "string" },
+                        "refreshToken": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Выход из системы (отзыв refresh token)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Успешный выход" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Получить текущего пользователя",
+        "responses": {
+          "200": {
+            "description": "Данные пользователя",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/businesses": {
+      "get": {
+        "tags": ["Business"],
+        "summary": "Получить список бизнес-проектов текущего пользователя",
+        "responses": {
+          "200": {
+            "description": "Список проектов",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Business" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Business"],
+        "summary": "Создать новый бизнес-проект",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string", "minLength": 1 },
+                  "description": { "type": "string" },
+                  "industry": { "type": "string" },
+                  "problemStatement": { "type": "string" },
+                  "targetAudience": { "type": "string" },
+                  "isExistingBusiness": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Созданный проект",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Business" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/businesses/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }
+      ],
+      "get": {
+        "tags": ["Business"],
+        "summary": "Получить детали бизнес-проекта",
+        "responses": {
+          "200": {
+            "description": "Данные проекта",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Business" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Business"],
+        "summary": "Обновить бизнес-проект",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "industry": { "type": "string" },
+                  "problemStatement": { "type": "string" },
+                  "targetAudience": { "type": "string" },
+                  "uniqueValue": { "type": "string" },
+                  "competitors": { "type": "string" },
+                  "monetizationModel": { "type": "string" },
+                  "marketSize": { "type": "string" },
+                  "hypotheses": { "type": "string" },
+                  "interviewResults": { "type": "string" },
+                  "mvpDescription": { "type": "string" },
+                  "inn": { "type": "string" },
+                  "ogrn": { "type": "string" },
+                  "legalForm": { "type": "string" },
+                  "taxSystem": { "type": "string" },
+                  "okvedCodes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Обновленный проект",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Business" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Business"],
+        "summary": "Удалить бизнес-проект",
+        "responses": {
+          "204": { "description": "Проект удален" }
+        }
+      }
+    },
+    "/businesses/{id}/competitors/analyze": {
+      "post": {
+        "tags": ["Business"],
+        "summary": "Проанализировать конкурентов с помощью ИИ",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": { "type": "integer", "default": 15 },
+                  "aiTier": { "type": "string", "enum": ["PLUS", "PREMIUM"], "default": "PREMIUM" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат анализа конкурентов"
+          }
+        }
+      }
+    },
+    "/businesses/profile/entrepreneur-type": {
+      "patch": {
+        "tags": ["Business"],
+        "summary": "Обновить тип предпринимателя",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string", "enum": ["DOMAIN_EXPERT", "COMPLETE_BEGINNER", "UNKNOWN"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Тип обновлен" }
+        }
+      }
+    },
+
+    "/chat/message": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Отправить сообщение в чат (SSE или обычный ответ)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["businessId", "content"],
+                "properties": {
+                  "content": { "type": "string", "minLength": 1, "maxLength": 2000 },
+                  "conversationId": { "type": "string", "format": "uuid" },
+                  "businessId": { "type": "string", "format": "uuid" },
+                  "stream": { "type": "boolean", "default": false },
+                  "aiTier": { "type": "string", "enum": ["PLUS", "PREMIUM"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ответ от ИИ (или SSE поток)"
+          }
+        }
+      }
+    },
+    "/chat/business/{businessId}/conversations": {
+      "get": {
+        "tags": ["Chat"],
+        "summary": "Получить все беседы бизнес-проекта",
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список бесед",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Conversation" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/conversations": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Создать новую беседу",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["businessId"],
+                "properties": {
+                  "businessId": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Созданная беседа",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Conversation" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/conversations/{conversationId}/messages": {
+      "get": {
+        "tags": ["Chat"],
+        "summary": "Получить сообщения беседы",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список сообщений",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Message" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/conversations/{conversationId}": {
+      "delete": {
+        "tags": ["Chat"],
+        "summary": "Удалить беседу",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Беседа удалена" }
+        }
+      }
+    },
+
+    "/roadmap/generate": {
+      "post": {
+        "tags": ["Roadmap"],
+        "summary": "Сгенерировать роадмап для бизнеса с помощью ИИ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["businessId"],
+                "properties": {
+                  "businessId": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Сгенерированный роадмап",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Roadmap" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmap/business/{businessId}": {
+      "get": {
+        "tags": ["Roadmap"],
+        "summary": "Получить роадмап бизнес-проекта",
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Роадмап проекта",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Roadmap" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmap/steps/{stepId}/start": {
+      "patch": {
+        "tags": ["Roadmap"],
+        "summary": "Начать работу над шагом роадмапа",
+        "parameters": [
+          {
+            "name": "stepId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Шаг обновлен",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RoadmapStep" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmap/steps/{stepId}/report": {
+      "post": {
+        "tags": ["Roadmap"],
+        "summary": "Отчитаться по выполнению шага",
+        "parameters": [
+          {
+            "name": "stepId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["report", "success"],
+                "properties": {
+                  "report": { "type": "string", "minLength": 1 },
+                  "success": { "type": "boolean" },
+                  "feedback": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат с AI-анализом и обновленным роадмапом",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "step": { "$ref": "#/components/schemas/RoadmapStep" },
+                    "aiAnalysis": { "type": "string" },
+                    "roadmap": { "$ref": "#/components/schemas/Roadmap" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/fns/search/inn/{inn}": {
+      "get": {
+        "tags": ["FNS"],
+        "summary": "Поиск компании по ИНН",
+        "parameters": [
+          {
+            "name": "inn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[0-9]{10,12}$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Данные компании",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FnsCompany" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fns/search/ogrn/{ogrn}": {
+      "get": {
+        "tags": ["FNS"],
+        "summary": "Поиск компании по ОГРН",
+        "parameters": [
+          {
+            "name": "ogrn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[0-9]{13}$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Данные компании",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FnsCompany" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fns/search/name": {
+      "get": {
+        "tags": ["FNS"],
+        "summary": "Поиск компании по названию",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 10 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список найденных компаний",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/FnsCompany" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fns/company/{inn}": {
+      "get": {
+        "tags": ["FNS"],
+        "summary": "Подробные данные о компании по ИНН",
+        "parameters": [
+          {
+            "name": "inn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Детальная информация о компании"
+          }
+        }
+      }
+    },
+    "/fns/okved/popular": {
+      "get": {
+        "tags": ["FNS"],
+        "summary": "Популярные коды ОКВЭД",
+        "responses": {
+          "200": {
+            "description": "Список популярных ОКВЭД"
+          }
+        }
+      }
+    },
+
+    "/files/upload": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Загрузить файл",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Загруженный файл",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Attachment" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/business/{businessId}": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Получить файлы бизнес-проекта",
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список файлов",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Attachment" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{id}": {
+      "delete": {
+        "tags": ["Files"],
+        "summary": "Удалить файл",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Файл удален" }
+        }
+      }
+    },
+
+    "/ai/models": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "Список доступных ИИ-моделей с информацией о подписке",
+        "responses": {
+          "200": {
+            "description": "Доступные модели и лимиты",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "default": { "type": "string" },
+                    "subscription": {
+                      "type": "object",
+                      "properties": {
+                        "plan": { "type": "string" },
+                        "until": { "type": "string", "format": "date-time" },
+                        "isActive": { "type": "boolean" },
+                        "limit": { "type": "integer" },
+                        "windowHours": { "type": "integer" }
+                      }
+                    },
+                    "tiers": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AIModelTier" }
+                    },
+                    "planLimits": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/usage": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "Текущее использование квоты сообщений",
+        "responses": {
+          "200": {
+            "description": "Использование квоты",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "used": { "type": "integer" },
+                    "limit": { "type": "integer" },
+                    "remaining": { "type": "integer" },
+                    "windowHours": { "type": "integer" },
+                    "resetsAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/admin/stats": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Статистика системы (только для ADMIN)",
+        "responses": {
+          "200": {
+            "description": "Статистика"
+          }
+        }
+      }
+    },
+    "/admin/plans": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Список конфигураций планов",
+        "responses": {
+          "200": {
+            "description": "Конфигурации планов",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PlanConfig" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/plans/{plan}": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Обновить конфигурацию плана",
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["FREE", "PLUS", "PREMIUM"] }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messagesPerWindow": { "type": "integer", "minimum": 1, "maximum": 100000 },
+                  "windowHours": { "type": "integer", "minimum": 1, "maximum": 168 },
+                  "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+                  "description": { "type": "string", "maxLength": 500, "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Обновленная конфигурация",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PlanConfig" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Список пользователей с фильтрацией и пагинацией",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Поиск по email, имени"
+          },
+          {
+            "name": "plan",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["FREE", "PLUS", "PREMIUM"] }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["USER", "ADMIN"] }
+          },
+          {
+            "name": "blocked",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список пользователей с пагинацией"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Детали пользователя",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Данные пользователя"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "summary": "Удалить пользователя",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Пользователь удален" }
+        }
+      }
+    },
+    "/admin/users/{id}/subscription": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Обновить подписку пользователя",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["plan"],
+                "properties": {
+                  "plan": { "type": "string", "enum": ["FREE", "PLUS", "PREMIUM"] },
+                  "until": { "type": "string", "format": "date-time", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Обновленный пользователь"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}/role": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Изменить роль пользователя",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["role"],
+                "properties": {
+                  "role": { "type": "string", "enum": ["USER", "ADMIN"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Роль обновлена"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}/blocked": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Заблокировать/разблокировать пользователя",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["blocked"],
+                "properties": {
+                  "blocked": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Статус блокировки обновлен"
+          }
+        }
+      }
+    }
+  }
+}

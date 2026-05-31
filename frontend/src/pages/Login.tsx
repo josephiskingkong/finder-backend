@@ -1,7 +1,6 @@
 import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Compass } from 'lucide-react'
 import './Auth.css'
 
 export default function Login() {
@@ -28,11 +27,13 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <div className="auth-bg-texture" />
+      <div className="auth-glow" />
+
+      <div className="auth-logo-top">FOUNDER</div>
+
       <div className="auth-card">
-        <div className="auth-logo">
-          <Compass size={32} strokeWidth={2.5} />
-        </div>
-        <h1 className="auth-title">Вход в Finder</h1>
+        <h1 className="auth-title">Вход в Founder</h1>
         <p className="auth-subtitle">ИИ-наставник для предпринимателей</p>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -66,11 +67,11 @@ export default function Login() {
             {loading ? 'Вход...' : 'Войти'}
           </button>
         </form>
-
-        <p className="auth-footer">
-          Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
-        </p>
       </div>
+
+      <p className="auth-footer">
+        Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+      </p>
     </div>
   )
 }

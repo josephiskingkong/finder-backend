@@ -15,6 +15,9 @@ import chatRoutes from './modules/chat/chat.routes';
 import roadmapRoutes from './modules/roadmap/roadmap.routes';
 import fnsRoutes from './modules/fns/fns.routes';
 import filesRoutes from './modules/files/files.routes';
+import aiRoutes from './modules/ai/ai.routes';
+import adminRoutes from './modules/admin/admin.routes';
+import interviewRoutes from './modules/interview/interview.routes';
 
 const app = express();
 
@@ -50,6 +53,9 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/roadmap', roadmapRoutes);
 app.use('/api/fns', fnsRoutes);
 app.use('/api/files', filesRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/interview', interviewRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -67,7 +73,7 @@ if (!fs.existsSync(config.upload.dir)) {
 }
 
 app.listen(config.port, () => {
-  console.log(`🚀 Finder Backend запущен на порту ${config.port}`);
+  console.log(`🚀 Founder Backend запущен на порту ${config.port}`);
   console.log(`📋 Среда: ${config.nodeEnv}`);
   console.log(`📡 API: http://localhost:${config.port}/api`);
 });

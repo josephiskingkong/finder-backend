@@ -37,7 +37,18 @@ export async function register(input: RegisterInput) {
         create: { type: 'UNKNOWN' },
       },
     },
-    select: { id: true, email: true, firstName: true, lastName: true, createdAt: true },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      subscription: true,
+      subscriptionUntil: true,
+      isBlocked: true,
+      entrepreneurProfile: true,
+      createdAt: true,
+    },
   });
 
   const accessToken = generateAccessToken({ userId: user.id, email: user.email });
@@ -76,8 +87,23 @@ export async function login(input: LoginInput) {
     },
   });
 
+  const profile = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      subscription: true,
+      subscriptionUntil: true,
+      isBlocked: true,
+      entrepreneurProfile: true,
+    },
+  });
+
   return {
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+    user: profile,
     accessToken,
     refreshToken,
   };
@@ -87,7 +113,11 @@ export async function refresh(refreshTokenValue: string) {
   const stored = await prisma.refreshToken.findUnique({ where: { token: refreshTokenValue } });
   if (!stored || stored.expiresAt < new Date()) {
     if (stored) {
-      await prisma.refreshToken.delete({ where: { id: stored.id } });
+      try {
+        await prisma.refreshToken.delete({ where: { id: stored.id } });
+      } catch {
+        // Race condition: токен уже удалён другим запросом — игнорируем
+      }
     }
     throw new AppError('Refresh token недействителен или истёк', 401);
   }
@@ -98,7 +128,7 @@ export async function refresh(refreshTokenValue: string) {
   }
 
   // Ротация refresh-токена
-  await prisma.refreshToken.delete({ where: { id: stored.id } });
+  await prisma.refreshToken.deleteMany({ where: { id: stored.id } });
 
   const accessToken = generateAccessToken({ userId: user.id, email: user.email });
   const newRefreshToken = generateRefreshToken();
@@ -126,6 +156,10 @@ export async function getMe(userId: string) {
       email: true,
       firstName: true,
       lastName: true,
+      role: true,
+      subscription: true,
+      subscriptionUntil: true,
+      isBlocked: true,
       createdAt: true,
       entrepreneurProfile: true,
     },

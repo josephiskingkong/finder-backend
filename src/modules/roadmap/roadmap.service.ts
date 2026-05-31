@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../utils/errors';
-import { sendChat, sendChatJSON, ChatMessage } from '../../services/openai.service';
+import { sendChat, sendChatJSON } from '../../services/ai.service';
+import type { ChatMessage } from '../../services/openai.service';
 import { SYSTEM_PROMPT_ROADMAP_GENERATION, SYSTEM_PROMPT_STEP_ANALYSIS, SYSTEM_PROMPT_EXTRACT_BUSINESS_INFO } from '../../prompts/system';
 import { ReportStepInput } from './roadmap.validation';
 // RoadmapPhase определён в Prisma schema

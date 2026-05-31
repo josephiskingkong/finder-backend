@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as businessService from './business.service';
+import * as competitorsService from './competitors.service';
 import { createBusinessSchema, updateBusinessSchema } from './business.validation';
 import { sendSuccess, sendCreated, sendNoContent } from '../../utils/response';
 
@@ -28,6 +29,18 @@ export async function updateBusinessHandler(req: Request, res: Response) {
 export async function deleteBusinessHandler(req: Request, res: Response) {
   await businessService.deleteBusiness(req.user!.userId, req.params.id as string);
   sendNoContent(res);
+}
+
+export async function analyzeCompetitorsHandler(req: Request, res: Response) {
+  const businessId = req.params.id as string;
+  const extraHint = typeof req.body?.hint === 'string' ? req.body.hint : undefined;
+  const aiTier = (req.body?.aiTier === 'PLUS' || req.body?.aiTier === 'PREMIUM') ? req.body.aiTier : undefined;
+  const result = await competitorsService.analyzeCompetitorsForBusiness(
+    req.user!.userId,
+    businessId,
+    { extraHint, aiTier },
+  );
+  sendSuccess(res, result);
 }
 
 export async function updateEntrepreneurTypeHandler(req: Request, res: Response) {

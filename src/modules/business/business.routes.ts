@@ -12,6 +12,7 @@ router.get('/', asyncHandler(businessController.getBusinessesHandler));
 router.get('/:id', asyncHandler(businessController.getBusinessHandler));
 router.patch('/:id', asyncHandler(businessController.updateBusinessHandler));
 router.delete('/:id', asyncHandler(businessController.deleteBusinessHandler));
+router.post('/:id/competitors/analyze', asyncHandler(businessController.analyzeCompetitorsHandler));
 router.patch('/profile/entrepreneur-type', asyncHandler(businessController.updateEntrepreneurTypeHandler));
 
 export default router;

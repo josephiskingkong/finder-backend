@@ -9,19 +9,60 @@ datasource db {
 
 // ==================== ПОЛЬЗОВАТЕЛИ ====================
 
+/// План подписки пользователя.
+/// FREE    — бесплатный (только бесплатные модели, которые будут добавлены позже).
+/// PLUS    — доступ к модели Сбер GigaChat (наш tier PLUS).
+/// PREMIUM — все модели (PLUS + PREMIUM=OpenAI).
+enum SubscriptionPlan {
+  FREE
+  PLUS
+  PREMIUM
+}
+
+/// Роль пользователя в системе. ADMIN получает доступ к админ-API.
+enum UserRole {
+  USER
+  ADMIN
+}
+
+/// Конфигурация лимитов на план подписки. Хранится в БД, чтобы админ мог менять
+/// без передеплоя. Одна строка на каждый SubscriptionPlan.
+/// Читается в subscription.service с in-memory кэшем (TTL 60 сек).
+model PlanConfig {
+  plan              SubscriptionPlan @id
+  /// Сколько USER-сообщений можно отправить в чат за rolling-window.
+  messagesPerWindow Int              @map("messages_per_window")
+  /// Длина окна в часах (например, 6).
+  windowHours       Int              @map("window_hours")
+  /// Человеко-читаемый ярлык для админки и страницы тарифов.
+  label             String
+  /// Опциональная описание плана для админки.
+  description       String?
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@map("plan_configs")
+}
+
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  passwordHash  String   @map("password_hash")
-  firstName     String?  @map("first_name")
-  lastName      String?  @map("last_name")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                String           @id @default(uuid())
+  email             String           @unique
+  passwordHash      String           @map("password_hash")
+  firstName         String?          @map("first_name")
+  lastName          String?          @map("last_name")
+  role              UserRole         @default(USER)
+  subscription      SubscriptionPlan @default(FREE)
+  /// Дата окончания платной подписки. null = бессрочно (например, для бесплатного плана).
+  subscriptionUntil DateTime?        @map("subscription_until")
+  isBlocked         Boolean          @default(false) @map("is_blocked")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
 
   entrepreneurProfile EntrepreneurProfile?
   businesses          Business[]
   refreshTokens       RefreshToken[]
 
+  @@index([role])
+  @@index([subscription])
   @@map("users")
 }
 
@@ -89,7 +130,7 @@ model Business {
   marketSize        String?  @map("market_size")
   hypotheses        String?
   interviewResults  String?  @map("interview_results")
-  mvpDescription    String?  @map("mvp_description")
+  // Interview hypotheses (replacing mvpDescription)
 
   inn        String?
   ogrn       String?
@@ -104,6 +145,7 @@ model Business {
   roadmap  Roadmap?
   chats    Conversation[]
   files    Attachment[]
+  interviewHypotheses Hypothesis[] // Гипотезы для проверки на интервью
 
   @@map("businesses")
 }
@@ -116,7 +158,7 @@ enum RoadmapPhase {
   MARKET_ANALYSIS
   MONETIZATION
   USER_INTERVIEWS
-  MVP_CREATION
+  MVP_CREATION       // DEPRECATED: оставлен для совместимости с существующими данными
   REPEAT_CUSTDEV
   REGISTRATION
   ACCOUNTING
@@ -170,10 +212,27 @@ model RoadmapStep {
 
 // ==================== ЧАТ ====================
 
+/// Уровень/провайдер ИИ-модели, выбираемый пользователем во фронте.
+/// PREMIUM = OpenAI GPT, PLUS = Сбер GigaChat.
+enum AiTier {
+  PREMIUM
+  PLUS
+}
+
 model Conversation {
   id         String   @id @default(uuid())
   businessId String   @map("business_id")
   title      String?
+  aiTier     AiTier   @default(PREMIUM) @map("ai_tier")
+  /// Сжатая выжимка прошлых сообщений (rolling summary). null = ещё не было сжатия,
+  /// беседа короткая и идёт в LLM целиком.
+  summary    String?
+  /// Отсечка: все сообщения с createdAt <= этого момента считаются ужатыми в `summary`.
+  /// Recent buffer берётся как сообщения с createdAt > summaryUpTo.
+  summaryUpTo         DateTime? @map("summary_up_to")
+  /// Сколько сообщений уже учтено в summary — нужно чтобы дёшево решить,
+  /// пора ли перестраивать выжимку, без COUNT(*) на каждом запросе.
+  summarizedCount     Int       @default(0) @map("summarized_count")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -229,4 +288,108 @@ model StepAttachment {
 
   @@unique([stepId, attachmentId])
   @@map("step_attachments")
+}
+
+// ==================== ИНТЕРВЬЮ / ГИПОТЕЗЫ ====================
+
+enum HypothesisStatus {
+  PENDING      // Ожидает проверки
+  CONFIRMED    // Подтверждена интервью
+  REJECTED     // Опровергнута
+  PARTIALLY    // Частично подтверждена
+}
+
+/// Гипотеза бизнес-проекта для проверки через интервью
+model Hypothesis {
+  id          String           @id @default(uuid())
+  businessId  String           @map("business_id")
+  statement   String           // Текст гипотезы (например: "Пользователи готовы платить 500р за доставку за 1 час")
+  category    String           // Категория: проблема, решение, цена, канал и т.д.
+  status      HypothesisStatus @default(PENDING)
+  isAiGenerated Boolean        @default(false) @map("is_ai_generated")
+  priority    Int              @default(1)      // Приоритет проверки (1-5)
+  
+  // Результаты проверки
+  evidenceSummary String?      @map("evidence_summary") // Сводка доказательств из интервью
+  confirmedCount  Int          @default(0) @map("confirmed_count")   // Сколько раз подтверждена
+  rejectedCount   Int          @default(0) @map("rejected_count")    // Сколько раз отвергнута
+  
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  business  Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  questions InterviewQuestion[]
+  findings  InterviewFinding[]
+
+  @@index([businessId])
+  @@index([status])
+  @@map("hypotheses")
+}
+
+/// Вопрос для проверки гипотезы на интервью
+model InterviewQuestion {
+  id            String   @id @default(uuid())
+  hypothesisId  String   @map("hypothesis_id")
+  question      String   // Текст вопроса
+  questionType  String   @default("open") @map("question_type") // open, yes_no, scale
+  isAiGenerated Boolean  @default(false) @map("is_ai_generated")
+  order         Int      @default(0)
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+
+  @@index([hypothesisId])
+  @@map("interview_questions")
+}
+
+/// Результат проверки гипотезы в конкретном интервью
+model InterviewFinding {
+  id           String   @id @default(uuid())
+  hypothesisId String   @map("hypothesis_id")
+  interviewee  String   // Имя/идентификатор респондента
+  notes        String?  // Заметки из интервью
+  verdict      String   // confirmed, rejected, unclear
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+
+  @@index([hypothesisId])
+  @@map("interview_findings")
+}
+
+// ==================== КЭШ ДАННЫХ ФНС / КОНКУРЕНТОВ ====================
+
+/// Кэш карточек компаний, полученных из API ФНС (api-fns.ru) по ИНН.
+/// Используется для повторного использования между пользователями (TTL ~ 7 дней).
+model FnsCompanyCache {
+  id          String   @id @default(uuid())
+  inn         String   @unique
+  ogrn        String?
+  name        String
+  /// Сырая структурированная карточка (JSON-строка) — то, что мы отдаём наружу.
+  payload     String
+  /// Когда запись истекает и должна быть перезапрошена.
+  expiresAt   DateTime @map("expires_at")
+  fetchedAt   DateTime @default(now()) @map("fetched_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([expiresAt])
+  @@map("fns_company_cache")
+}
+
+/// Кэш результатов поиска по строковому запросу (название/отрасль/город).
+/// Хранит топ-N найденных ИНН — детали лежат в FnsCompanyCache.
+model FnsSearchCache {
+  id        String   @id @default(uuid())
+  /// Нормализованный поисковый ключ (lowercase, обрезанные пробелы).
+  query     String   @unique
+  /// JSON-массив строк ИНН в порядке релевантности.
+  innList   String   @map("inn_list")
+  expiresAt DateTime @map("expires_at")
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@index([expiresAt])
+  @@map("fns_search_cache")
 }

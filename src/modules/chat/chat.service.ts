@@ -1,9 +1,32 @@
 import prisma from '../../config/database';
 import { AppError } from '../../utils/errors';
 import { SendMessageInput } from './chat.validation';
-import { sendChat, streamChat, sendChatJSON, ChatMessage } from '../../services/openai.service';
+import type { ChatMessage } from '../../services/openai.service';
+import { sendChat, streamChat, sendChatJSON, DEFAULT_AI_TIER } from '../../services/ai.service';
+import type { AiTier } from '../../services/ai.service';
 import { SYSTEM_PROMPT_MAIN, SYSTEM_PROMPT_ONBOARDING, SYSTEM_PROMPT_EXTRACT_BUSINESS_INFO } from '../../prompts/system';
+import { analyzeCompetitorsForBusiness, CompetitorAnalysisResult } from '../business/competitors.service';
+import { assertTierAllowed, assertMessageQuota, getSubscriptionState } from '../../services/subscription.service';
+import {
+  rebuildSummary,
+  shouldRebuildSummary,
+  RECENT_BUFFER_SIZE,
+} from '../../services/summary.service';
+import { clipLongAssistantMessage, estimateTokens } from '../../utils/tokens';
 import { Response } from 'express';
+
+/// Триггер-фразы, при которых перед ответом ИИ автоматически подтягиваем данные ФНС.
+const COMPETITOR_INTENT_PATTERN = /(конкурент|конкуренц|анализ\s+рынка|анализ\s+конкур|спарси\w*\s+конкур|проверь\s+конкур|кто\s+уже\s+на\s+рынке|кто\s+есть\s+на\s+рынке|похожие\s+(компании|бизнес)|данн(ые|ых)\s+(из\s+)?(ЕГРЮЛ|ЕГРИП|ФНС))/i;
+
+function safeJsonStringify(obj: unknown): string {
+  try {
+    return JSON.stringify(obj);
+  } catch {
+    return JSON.stringify(Object.fromEntries(
+      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+    ));
+  }
+}
 
 /**
  * Собирает контекст бизнеса для системного промпта.
@@ -26,33 +49,41 @@ async function buildBusinessContext(businessId: string): Promise<string> {
   const profile = business.user.entrepreneurProfile;
   const roadmap = business.roadmap;
 
-  let context = `\n\n## Контекст проекта пользователя:\n`;
+  // Обрезаем длинные текстовые поля, чтобы не раздувать input-токены.
+  const trim = (s: string | null | undefined, max = 200) =>
+    s ? (s.length > max ? s.slice(0, max) + '…' : s) : null;
+
+  let context = `\n\n## Проект:\n`;
   context += `- **Название:** ${business.title}\n`;
-  if (business.description) context += `- **Описание:** ${business.description}\n`;
+  if (business.description) context += `- **Описание:** ${trim(business.description)}\n`;
   if (business.industry) context += `- **Отрасль:** ${business.industry}\n`;
-  if (business.problemStatement) context += `- **Проблема:** ${business.problemStatement}\n`;
-  if (business.targetAudience) context += `- **Целевая аудитория:** ${business.targetAudience}\n`;
-  if (business.uniqueValue) context += `- **Уникальное предложение:** ${business.uniqueValue}\n`;
-  if (business.competitors) context += `- **Конкуренты:** ${business.competitors}\n`;
-  if (business.monetizationModel) context += `- **Монетизация:** ${business.monetizationModel}\n`;
+  if (business.problemStatement) context += `- **Проблема:** ${trim(business.problemStatement)}\n`;
+  if (business.targetAudience) context += `- **ЦА:** ${trim(business.targetAudience)}\n`;
+  if (business.uniqueValue) context += `- **УТП:** ${trim(business.uniqueValue)}\n`;
+  if (business.competitors) context += `- **Конкуренты:** ${trim(business.competitors)}\n`;
+  if (business.monetizationModel) context += `- **Монетизация:** ${trim(business.monetizationModel)}\n`;
   if (business.legalForm) context += `- **Юр. форма:** ${business.legalForm}\n`;
-  if (business.taxSystem) context += `- **Налоговая система:** ${business.taxSystem}\n`;
-  context += `- **Статус проекта:** ${business.status}\n`;
+  if (business.taxSystem) context += `- **Налоги:** ${business.taxSystem}\n`;
+  context += `- **Статус:** ${business.status}\n`;
 
   if (profile) {
-    context += `\n## Профиль предпринимателя:\n`;
-    context += `- **Тип:** ${profile.type === 'DOMAIN_EXPERT' ? 'Эксперт в предметной области (разбирается в сфере, но не в бизнесе)' : profile.type === 'COMPLETE_BEGINNER' ? 'Полный новичок (не разбирается ни в бизнесе, ни в предметке)' : 'Не определён'}\n`;
-    if (profile.industryKnowledge) context += `- **Область знаний:** ${profile.industryKnowledge}\n`;
-    if (profile.experienceYears) context += `- **Опыт:** ${profile.experienceYears} лет\n`;
+    const profileType = profile.type === 'DOMAIN_EXPERT' ? 'DOMAIN_EXPERT' : profile.type === 'COMPLETE_BEGINNER' ? 'COMPLETE_BEGINNER' : profile.type;
+    context += `\n## Предприниматель: ${profileType}`;
+    if (profile.industryKnowledge) context += `, сфера: ${trim(profile.industryKnowledge, 80)}`;
+    if (profile.experienceYears) context += `, опыт: ${profile.experienceYears} лет`;
+    context += '\n';
   }
 
   if (roadmap?.steps?.length) {
-    context += `\n## Текущий роадмап:\n`;
-    for (const step of roadmap.steps) {
+    context += `\n## Роадмап:\n`;
+    // Ограничиваем 10 шагами; отчёты обрезаем до 100 символов
+    const stepsToShow = roadmap.steps.slice(0, 10);
+    for (const step of stepsToShow) {
       const statusEmoji = step.status === 'COMPLETED' ? '✅' : step.status === 'IN_PROGRESS' ? '🔄' : step.status === 'AVAILABLE' ? '⬜' : '🔒';
       context += `${statusEmoji} ${step.order}. ${step.title} (${step.status})\n`;
-      if (step.userReport) context += `   Отчёт: ${step.userReport}\n`;
+      if (step.userReport) context += `   Отчёт: ${trim(step.userReport, 100)}\n`;
     }
+    if (roadmap.steps.length > 10) context += `   … ещё ${roadmap.steps.length - 10} шагов\n`;
   }
 
   return context;
@@ -70,13 +101,35 @@ export async function sendMessage(userId: string, input: SendMessageInput, res?:
     throw new AppError('Бизнес-проект не найден', 404);
   }
 
-  // Получаем или создаём беседу
+  // Получаем или создаём беседу, фиксируем выбранный tier ИИ.
   let conversationId = input.conversationId;
+  let aiTier: AiTier = input.aiTier || DEFAULT_AI_TIER;
+
+  // Подписка: проверяем, что выбранный tier разрешён планом пользователя.
+  // Если пользователь не указал tier — выбираем максимально доступный (PREMIUM > PLUS).
+  const subscription = await getSubscriptionState(userId);
+  if (input.aiTier) {
+    await assertTierAllowed(userId, input.aiTier);
+  } else if (subscription.allowedTiers.length === 0) {
+    throw new AppError(
+      `На вашем тарифе (${subscription.plan}) ИИ-модели пока недоступны. Перейдите на подписку Plus или Premium.`,
+      403,
+    );
+  } else {
+    aiTier = subscription.allowedTiers.includes('PREMIUM') ? 'PREMIUM' : subscription.allowedTiers[0];
+  }
+
+  // Rate-limit: проверяем квоту сообщений в rolling-window (FREE 10/6ч, PLUS 100/6ч, PREMIUM 500/6ч).
+  // Проверяем ДО сохранения сообщения юзера в БД и ДО вызова LLM, чтобы:
+  //  - не платить за LLM, если юзер всё равно упёрся в лимит;
+  //  - не загрязнять историю чата сообщениями, на которые не было ответа.
+  await assertMessageQuota(userId);
   if (!conversationId) {
     const conversation = await prisma.conversation.create({
       data: {
         businessId: input.businessId,
         title: input.content.substring(0, 100),
+        aiTier,
       },
     });
     conversationId = conversation.id;
@@ -86,6 +139,13 @@ export async function sendMessage(userId: string, input: SendMessageInput, res?:
     });
     if (!conv) {
       throw new AppError('Беседа не найдена', 404);
+    }
+    // Если фронт прислал явный tier — обновим беседу, иначе используем сохранённый.
+    if (input.aiTier && input.aiTier !== conv.aiTier) {
+      await prisma.conversation.update({ where: { id: conversationId }, data: { aiTier: input.aiTier } });
+      aiTier = input.aiTier;
+    } else {
+      aiTier = conv.aiTier as AiTier;
     }
   }
 
@@ -98,64 +158,153 @@ export async function sendMessage(userId: string, input: SendMessageInput, res?:
     },
   });
 
-  // Собираем историю переписки
-  const messages = await prisma.message.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: 'asc' },
-    take: 50, // Лимит контекстного окна
+  // Получаем актуальную беседу с полями rolling-summary.
+  const convFull = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { summary: true, summaryUpTo: true, summarizedCount: true },
   });
 
-  // Строим контекст
+  // === Сборка контекстного окна (rolling summary + recent buffer) ===
+  //
+  // 1) RECENT_BUFFER_SIZE последних сообщений → идут в LLM verbatim.
+  // 2) Всё, что раньше, — заменяется на одно SYSTEM-сообщение с conv.summary (если он есть).
+  //
+  // Это в ~3 раза снижает input-токены на длинных беседах без потери качества:
+  // тон/недавние факты сохраняются в recent buffer, а долгая память — в summary.
+  const recentMessagesDesc = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: 'desc' },
+    take: RECENT_BUFFER_SIZE,
+    select: { role: true, content: true },
+  });
+  const recentMessages = recentMessagesDesc.reverse();
+
+  const totalMessagesNow = await prisma.message.count({ where: { conversationId } });
+
+  // Строим контекст бизнеса (генерируется из БД на лету).
   const businessContext = await buildBusinessContext(input.businessId);
-  const isOnboarding = business.status === 'IDEA_GENERATION' && messages.length <= 2;
+  // Онбординг определяем по реальному размеру беседы, а не размеру буфера.
+  const isOnboarding = business.status === 'IDEA_GENERATION' && totalMessagesNow <= 2;
   const systemPrompt = isOnboarding ? SYSTEM_PROMPT_ONBOARDING : SYSTEM_PROMPT_MAIN;
 
+  // Если пользователь запросил анализ конкурентов — сначала получаем данные ФНС,
+  // затем инжектируем в промпт ИИ и дополнительно отправляем карточку в SSE до стрима.
+  let competitorsContext = '';
+  let competitorsResult: CompetitorAnalysisResult | null = null;
+  if (shouldFetchCompetitors(input.content, business.status)) {
+    const cr = await buildCompetitorsContext(userId, input.businessId, input.content, aiTier);
+    competitorsContext = cr.markdown;
+    competitorsResult = cr.result;
+  }
+
+  // Если стрим + есть данные конкурентов — отправляем карточку в SSE до начала генерации текста.
+  if (input.stream && res && competitorsResult) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.write(`data: ${safeJsonStringify({ competitors: competitorsResult })}
+
+`);
+  }
+
+  const summaryContext = convFull?.summary
+    ? `\n\n## Память о прошлой части беседы:\n${convFull.summary}`
+    : '';
+
+  // Для PREMIUM (OpenAI) — competitors в system prompt, он строго следует инструкциям.
+  // Для PLUS (GigaChat) — competitors в последнее user-сообщение, он игнорирует
+  // вспомогательные system-сообщения, но реагирует на данные в user-запросе.
+  const processedRecent = recentMessages.map((m: { role: string; content: string }) => {
+    const role = m.role.toLowerCase() as 'user' | 'assistant' | 'system';
+    const content = role === 'assistant' ? clipLongAssistantMessage(m.content) : m.content;
+    return { role, content };
+  });
+
+  if (aiTier === 'PLUS' && competitorsContext) {
+    const lastIdx = processedRecent.length - 1;
+    if (lastIdx >= 0 && processedRecent[lastIdx].role === 'user') {
+      processedRecent[lastIdx] = {
+        ...processedRecent[lastIdx],
+        content: processedRecent[lastIdx].content
+          + '\n\n---\nВАЖНО: проанализируй ТОЛЬКО эти компании из реестра ФНС. Не придумывай других.\n'
+          + competitorsContext,
+      };
+    }
+  }
+
+  const fullSystemPrompt = systemPrompt + businessContext
+    + (aiTier === 'PREMIUM' && competitorsContext ? '\n' + competitorsContext : '')
+    + summaryContext;
+
   const chatMessages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt + businessContext },
-    ...messages.map((m: { role: string; content: string }) => ({
-      role: m.role.toLowerCase() as 'user' | 'assistant' | 'system',
-      content: m.content,
-    })),
+    { role: 'system', content: fullSystemPrompt },
+    ...processedRecent,
   ];
 
-  // Отправляем в LLM
+  // Отправляем в LLM через выбранный пользователем tier (PREMIUM/PLUS)
   let aiResponse: string;
 
   if (input.stream && res) {
-    aiResponse = await streamChat(chatMessages, res);
+    aiResponse = await streamChat(chatMessages, res, { tier: aiTier, userMessage: input.content });
   } else {
-    aiResponse = await sendChat(chatMessages);
+    aiResponse = await sendChat(chatMessages, { tier: aiTier, userMessage: input.content });
   }
 
-  // Сохраняем ответ ИИ
+  // Считаем эвристические токены для метрик стоимости (точность ±15%, без сторонних зависимостей).
+  // Это пишется в Message.metadata — потом видно в админке/аналитике, сколько уходит на каждого юзера.
+  const inputTokens = chatMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+  const outputTokens = estimateTokens(aiResponse);
+  const usedSummary = !!convFull?.summary;
+
+  // Сохраняем ответ ИИ + метаданные о расходе.
   await prisma.message.create({
     data: {
       conversationId,
       role: 'ASSISTANT',
       content: aiResponse,
+      metadata: safeJsonStringify({
+        aiTier,
+        tokensIn: inputTokens,
+        tokensOut: outputTokens,
+        usedSummary,
+        recentBufferSize: recentMessages.length,
+        competitorsAttached: !!competitorsContext,
+        ...(competitorsResult ? { competitorsResult } : {}),
+      }),
     },
   });
 
   // Обновляем title беседы, если это первое сообщение
-  if (messages.length <= 1) {
+  if (totalMessagesNow <= 1) {
     await prisma.conversation.update({
       where: { id: conversationId },
       data: { title: input.content.substring(0, 100) },
     });
   }
 
-  // Автоматически извлекаем бизнес-инфо из чата каждые 4 сообщения
-  const totalMessages = messages.length + 1; // +1 за новый ответ ИИ
-  if (totalMessages >= 4 && totalMessages % 4 === 0) {
+  // totalMessagesNow считалось ДО сохранения ответа ИИ → теперь сообщений на 1 больше.
+  const totalAfter = totalMessagesNow + 1;
+
+  // Автоматически извлекаем бизнес-инфо из чата каждые 4 сообщения.
+  if (totalAfter >= 4 && totalAfter % 4 === 0) {
     extractAndUpdateBusiness(input.businessId, conversationId).catch(err =>
       console.error('[chat] extractAndUpdateBusiness error:', err)
     );
+  }
+
+  // Rolling summary: если беседа разрослась — фоном перестраиваем выжимку.
+  // Не блокируем HTTP-ответ: фон работает дешёвой моделью, ошибки только логирует.
+  if (shouldRebuildSummary(totalAfter, convFull?.summarizedCount ?? 0)) {
+    setImmediate(() => {
+      void rebuildSummary(conversationId);
+    });
   }
 
   if (!input.stream) {
     return {
       conversationId,
       message: aiResponse,
+      aiTier,
     };
   }
 }
@@ -229,6 +378,26 @@ async function extractAndUpdateBusiness(businessId: string, conversationId: stri
   }
 }
 
+export async function createConversation(userId: string, businessId: string, title?: string) {
+  // Проверяем что бизнес принадлежит пользователю
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, userId },
+  });
+  if (!business) {
+    throw new AppError('Бизнес-проект не найден', 404);
+  }
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      businessId,
+      title: title || 'Новый чат',
+      aiTier: 'PREMIUM',
+    },
+  });
+
+  return conversation;
+}
+
 export async function getConversations(userId: string, businessId: string) {
   return prisma.conversation.findMany({
     where: { businessId, business: { userId } },
@@ -254,6 +423,59 @@ export async function getConversationMessages(userId: string, conversationId: st
     where: { conversationId },
     orderBy: { createdAt: 'asc' },
   });
+}
+
+/**
+ * Решает, нужно ли перед ответом ИИ автоматически дёрнуть анализ конкурентов через ФНС.
+ * Триггерится либо по ключевым словам пользователя, либо на этапе анализа рынка.
+ */
+function shouldFetchCompetitors(userMessage: string, businessStatus: string): boolean {
+  if (!userMessage) return false;
+  if (COMPETITOR_INTENT_PATTERN.test(userMessage)) return true;
+  if (businessStatus === 'ANALYSIS' && /рынок|рынка|конкур|анализ/i.test(userMessage)) return true;
+  return false;
+}
+
+/**
+ * Получает данные конкурентов через `competitors.service` (с кэшем ФНС на 7 дней).
+ * Возвращает markdown-блок для промпта ИИ + сырые данные для SSE-фрейма в клиент.
+ */
+async function buildCompetitorsContext(
+  userId: string,
+  businessId: string,
+  hint: string,
+  aiTier?: AiTier,
+): Promise<{ markdown: string; result: CompetitorAnalysisResult | null }> {
+  const FALLBACK_MARKDOWN = [
+    '\n\n## Инструкция по конкурентному анализу (ФНС временно недоступен)',
+    'Система попыталась запросить данные из ЕГРЮЛ/ЕГРИП, но сервис ФНС сейчас недоступен.',
+    'Проведи анализ конкурентов на основе своих знаний о рынке.',
+  ].join('\n');
+
+  try {
+    const result = await analyzeCompetitorsForBusiness(userId, businessId, { extraHint: hint, aiTier });
+    console.log('[chat] competitors result:', result.foundCount, 'found,', result.totalCandidates, 'total');
+
+    if (result.items.length === 0) {
+      return { markdown: FALLBACK_MARKDOWN, result: null };
+    }
+
+    const lines: string[] = [];
+    lines.push('\n\n## РЕАЛЬНЫЕ КОНКУРЕНТЫ ИЗ ЕГРЮЛ/ЕГРИП — СТРОГО ОБЯЗАТЕЛЬНО К ИСПОЛЬЗОВАНИЮ');
+    lines.push('Ниже — реальные компании из государственного реестра ФНС РФ.');
+    lines.push('КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО:');
+    lines.push('- Упоминать любые компании, не перечисленные в этом блоке.');
+    lines.push('- Выдумывать названия, ИНН, ОГРН, выручку, руководителей.');
+    lines.push('- Проводить анализ по "известным" конкурентам из своих знаний.');
+    lines.push('Твой анализ должен быть ТОЛЬКО по компаниям из блока ниже.');
+    lines.push('Если компании не профильные (неверный ОКВЭД) — отметь это явно, но всё равно анализируй только их.');
+    lines.push('');
+    lines.push(result.summaryMarkdown);
+    return { markdown: lines.join('\n'), result };
+  } catch (err) {
+    console.warn('[chat] buildCompetitorsContext failed:', err);
+    return { markdown: FALLBACK_MARKDOWN, result: null };
+  }
 }
 
 export async function deleteConversation(userId: string, conversationId: string) {

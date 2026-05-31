@@ -6,6 +6,10 @@ interface User {
   email: string
   firstName?: string
   lastName?: string
+  role?: 'USER' | 'ADMIN'
+  subscription?: 'FREE' | 'PLUS' | 'PREMIUM'
+  subscriptionUntil?: string | null
+  isBlocked?: boolean
   entrepreneurProfile?: {
     type: string
     industryKnowledge?: string
@@ -31,7 +35,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       api.get<User>('/auth/me')
         .then(setUser)
-        .catch(() => localStorage.clear())
+        .catch((err: any) => {
+          // Чистим сессию ТОЛЬКО при явном отказе авторизации (401/403).
+          // Сетевая ошибка (ECONNREFUSED, таймаут, NETWORK_ERROR) — сервер просто не запущен,
+          // не нужно выбрасывать пользователя из аккаунта.
+          const status = err?.status ?? err?.response?.status
+          const isNetworkError = !status || err?.message?.includes('NETWORK') || err?.message?.includes('fetch')
+          if ((status === 401 || status === 403) && !isNetworkError) {
+            localStorage.clear()
+          }
+        })
         .finally(() => setLoading(false))
     } else {
       setLoading(false)

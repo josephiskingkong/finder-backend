@@ -1,5 +1,19 @@
 const BASE = '/api';
 
+/**
+ * Кастомная ошибка API с полем `meta` от бэка.
+ * Используется, например, для 429 Quota Exceeded — там приходит resetAt, limit, plan.
+ */
+export class ApiError extends Error {
+  status: number;
+  meta?: Record<string, any>;
+  constructor(message: string, status: number, meta?: Record<string, any>) {
+    super(message);
+    this.status = status;
+    this.meta = meta;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('accessToken');
   const headers: Record<string, string> = {
@@ -7,25 +21,38 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { ...options, headers });
+  } catch (err) {
+    // Сетевая ошибка (сервер не запущен, нет сети) — не чистим токены
+    throw new ApiError('Сервер недоступен, попробуйте позже', 503);
+  }
 
   if (res.status === 401) {
-    const refreshed = await tryRefresh();
-    if (refreshed) {
-      headers.Authorization = `Bearer ${localStorage.getItem('accessToken')}`;
-      const retry = await fetch(`${BASE}${path}`, { ...options, headers });
-      if (!retry.ok) throw new Error('Ошибка запроса');
-      return retry.json();
+    try {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        headers.Authorization = `Bearer ${localStorage.getItem('accessToken')}`;
+        const retry = await fetch(`${BASE}${path}`, { ...options, headers });
+        if (!retry.ok) throw new ApiError('Ошибка запроса', retry.status);
+        return retry.json();
+      }
+    } catch (refreshErr: any) {
+      // Network error — сервер недоступен, не выбрасываем из аккаунта
+      if (refreshErr?.message === 'NETWORK_ERROR') {
+        throw new ApiError('Сервер недоступен, попробуйте позже', 503);
+      }
     }
     localStorage.clear();
     window.location.href = '/login';
-    throw new Error('Сессия истекла');
+    throw new ApiError('Сессия истекла', 401);
   }
 
   if (res.status === 204) return undefined as T;
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Ошибка запроса');
+    throw new ApiError(data.error || 'Ошибка запроса', res.status, data.meta);
   }
 
   const json = await res.json();
@@ -46,8 +73,10 @@ async function tryRefresh(): Promise<boolean> {
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('refreshToken', data.refreshToken);
     return true;
-  } catch {
-    return false;
+  } catch (err: any) {
+    // Любая сетевая ошибка (ECONNREFUSED, timeout, aborted) — сервер не запущен
+    // Не чистим токены, просто сообщаем что рефреш не удался из-за сети
+    throw new Error('NETWORK_ERROR');
   }
 }
 
@@ -63,9 +92,10 @@ export const api = {
 
 // SSE стриминг для чата
 export function streamMessage(
-  body: { content: string; businessId: string; conversationId?: string; stream: true },
+  body: { content: string; businessId: string; conversationId?: string; stream: true; aiTier?: 'PLUS' | 'PREMIUM' },
   onChunk: (text: string) => void,
-  onDone: () => void,
+  onDone: (err?: string, meta?: Record<string, any>) => void,
+  onCompetitors?: (data: unknown) => void,
 ) {
   const token = localStorage.getItem('accessToken');
   fetch(`${BASE}/chat/message`, {
@@ -77,8 +107,15 @@ export function streamMessage(
     body: JSON.stringify(body),
   }).then(async (res) => {
     if (!res.ok || !res.body) {
-      console.error('[streamMessage] HTTP error:', res.status);
-      onDone();
+      let msg = 'Ошибка запроса';
+      let meta: Record<string, any> | undefined;
+      try {
+        const data = await res.json();
+        msg = data.error || msg;
+        meta = data.meta;
+      } catch {}
+      console.error('[streamMessage] HTTP error:', res.status, msg);
+      onDone(msg, meta);
       return;
     }
     const reader = res.body.getReader();
@@ -99,8 +136,9 @@ export function streamMessage(
             return;
           }
           try {
-            const { content } = JSON.parse(payload);
-            if (content) onChunk(content);
+            const parsed = JSON.parse(payload);
+            if (parsed.content) onChunk(parsed.content);
+            if (parsed.competitors && onCompetitors) onCompetitors(parsed.competitors);
           } catch {}
         }
       }
