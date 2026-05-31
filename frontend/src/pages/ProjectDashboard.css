@@ -1,0 +1,501 @@
+/* ===== ProjectDashboard — человечный минималистичный стиль ===== */
+
+.pd-page {
+  padding: 28px 32px 64px;
+  min-height: 100%;
+  background: var(--black);
+  overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ===== HEADER ===== */
+.pd-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.pd-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.pd-back:hover { background: var(--surface); color: var(--text-primary); }
+
+.pd-title-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pd-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pd-title-skeleton {
+  height: 28px;
+  width: 200px;
+  border-radius: 8px;
+  background: var(--surface);
+  animation: shimmer 1.4s infinite;
+}
+
+.pd-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(59, 94, 254, 0.15);
+  color: #3b5efe;
+  white-space: nowrap;
+}
+
+.pd-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ===== BUTTONS ===== */
+.pd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pd-btn-ghost {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--surface-border);
+}
+.pd-btn-ghost:hover { background: var(--surface-card); color: var(--text-primary); }
+
+.pd-btn-primary {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+.pd-btn-primary:hover:not(:disabled) { background: rgba(168, 85, 247, 0.3); }
+.pd-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.pd-btn-loading { animation: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+/* ===== INFO PILLS ===== */
+.pd-info-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+  align-items: flex-start;
+}
+
+.pd-info-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  transition: all 0.15s;
+  text-align: left;
+  max-width: 360px;
+}
+
+.pd-info-pill:hover {
+  border-color: rgba(255,255,255,0.18);
+  color: var(--text-primary);
+}
+
+.pd-info-pill.expanded {
+  border-radius: 12px;
+  padding: 10px 14px;
+  border-color: rgba(255,255,255,0.12);
+  background: var(--surface);
+  gap: 6px;
+}
+
+.pd-pill-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.pd-pill-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex: 1;
+}
+
+.pd-info-pill.expanded .pd-pill-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.pd-pill-arrow {
+  transition: transform 0.2s;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  opacity: 0.45;
+}
+.pd-info-pill.expanded .pd-pill-arrow { transform: rotate(180deg); }
+
+.pd-pill-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  width: 100%;
+}
+
+/* ===== CANVAS SECTION ===== */
+.pd-canvas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pd-canvas-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.pd-canvas-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.pd-canvas-updated {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ===== CANVAS TABLE ===== */
+.pd-canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  grid-template-areas:
+    "problem    segments   value"
+    "solution   channels   metrics"
+    "costs      unit       revenue";
+}
+
+[data-area="problem"]   { grid-area: problem; }
+[data-area="value"]     { grid-area: value; }
+[data-area="segments"]  { grid-area: segments; }
+[data-area="solution"]  { grid-area: solution; }
+[data-area="metrics"]   { grid-area: metrics; }
+[data-area="channels"]  { grid-area: channels; }
+[data-area="market"]    { grid-area: market; }
+[data-area="costs"]     { grid-area: costs; }
+[data-area="unit"]      { grid-area: unit; }
+[data-area="revenue"]   { grid-area: revenue; }
+[data-area="advantage"] {
+  grid-column: 1 / -1;
+}
+
+/* ===== CANVAS BLOCK ===== */
+.pd-canvas-block {
+  padding: 14px 20px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+  transition: background 0.15s;
+}
+
+.pd-canvas-block[data-area="value"],
+.pd-canvas-block[data-area="metrics"],
+.pd-canvas-block[data-area="revenue"],
+.pd-canvas-block[data-area="advantage"] {
+  border-right: none;
+}
+
+.pd-canvas-block:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+.pd-block-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pd-block-icon {
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+}
+
+.pd-block-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  flex: 1;
+  opacity: 0.7;
+}
+
+.pd-block-edit {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 5px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.pd-canvas-block:hover .pd-block-edit { opacity: 1; }
+.pd-block-edit:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+
+.pd-block-content {
+  flex: 1;
+}
+
+.pd-block-content p {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* Буллеты — каждая строка как пункт */
+.pd-block-content p::before {
+  display: none;
+}
+
+.pd-block-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pd-block-bullets li {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  padding-left: 20px;
+  position: relative;
+}
+
+.pd-block-bullets li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--block-color, rgba(255,255,255,0.3));
+  font-size: 11px;
+  top: 1px;
+  opacity: 0.8;
+}
+
+.pd-block-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ===== EDIT FORM ===== */
+.pd-block-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pd-block-textarea {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.5;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pd-block-textarea:focus {
+  outline: none;
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.pd-block-edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.pd-block-save, .pd-block-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pd-block-save {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+.pd-block-save:hover { background: rgba(34, 197, 94, 0.35); }
+
+.pd-block-cancel {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+.pd-block-cancel:hover { background: rgba(239, 68, 68, 0.25); }
+
+/* ===== EMPTY & SKELETON ===== */
+.pd-canvas-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 24px;
+  background: var(--surface);
+  border: 1px dashed var(--surface-border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.pd-canvas-empty p {
+  font-size: 15px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pd-canvas-empty span {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 400px;
+}
+
+.pd-canvas-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.pd-canvas-block-skeleton {
+  height: 120px;
+  border-radius: 14px;
+  background: var(--surface);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.pd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 760px) {
+  .pd-page { padding: 16px 12px 40px; }
+
+  .pd-canvas-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "problem    segments"
+      "value      value"
+      "solution   channels"
+      "metrics    market"
+      "costs      unit"
+      "revenue    revenue";
+  }
+
+  [data-area="value"],
+  [data-area="revenue"]  { border-right: none; }
+  [data-area="problem"],
+  [data-area="solution"],
+  [data-area="metrics"],
+  [data-area="costs"]    { border-right: 1px solid rgba(255,255,255,0.06); }
+}
+
+@media (max-width: 480px) {
+  .pd-canvas-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "problem" "segments" "value"
+      "solution" "channels" "metrics"
+      "costs" "unit" "revenue";
+  }
+  .pd-canvas-block { border-right: none !important; }
+}

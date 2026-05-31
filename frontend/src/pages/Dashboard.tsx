@@ -177,7 +177,7 @@ export default function Dashboard() {
         <div className="projects-grid">
           {businesses.map(biz => (
             <div key={biz.id} className="project-card">
-              <div className="project-card-body" onClick={() => setSelectedBiz(biz)}>
+              <div className="project-card-body" onClick={() => navigate(`/project?businessId=${biz.id}`)}>
                 <div className="project-card-header">
                   <h3 className="project-card-title">{biz.title}</h3>
                 </div>

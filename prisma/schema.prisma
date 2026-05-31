@@ -146,6 +146,7 @@ model Business {
   chats    Conversation[]
   files    Attachment[]
   interviewHypotheses Hypothesis[] // Гипотезы для проверки на интервью
+  canvas   BusinessCanvas?
 
   @@map("businesses")
 }
@@ -357,6 +358,49 @@ model InterviewFinding {
 
   @@index([hypothesisId])
   @@map("interview_findings")
+}
+
+// ==================== БИЗНЕС-КАНВАС (адаптация Остервальдера / Business Model Map) ====================
+
+/// Карта бизнес-модели проекта (аналог Lean Canvas / Business Model Canvas)
+/// Генерируется ИИ и обновляется автоматически по ходу работы над проектом
+model BusinessCanvas {
+  id         String   @id @default(uuid())
+  businessId String   @unique @map("business_id")
+
+  // Блок 1: Проблема / Боль клиента
+  problem    String?
+  // Блок 2: Клиентские сегменты
+  segments   String?
+  // Блок 3: Уникальное ценностное предложение
+  valueProposition String? @map("value_proposition")
+  // Блок 4: Решение / Продукт
+  solution   String?
+  // Блок 5: Каналы привлечения
+  channels   String?
+  // Блок 6: Рынок (TAM/SAM/SOM + конкуренты)
+  market     String?
+  // Блок 7: Ключевые метрики (AARRR, воронка)
+  metrics    String?
+  // Блок 8: Структура расходов
+  costStructure String? @map("cost_structure")
+  // Блок 9: Структура доходов / монетизация
+  revenueStructure String? @map("revenue_structure")
+  // Блок 10: Unit-экономика
+  unitEconomics String? @map("unit_economics")
+  // Блок 11: Несправедливое преимущество
+  unfairAdvantage String? @map("unfair_advantage")
+
+  // Версия / источник последнего обновления
+  lastGeneratedAt DateTime? @map("last_generated_at")
+  generationSource String?  @map("generation_source") // "ai_chat" | "roadmap_step" | "manual"
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("business_canvas")
 }
 
 // ==================== КЭШ ДАННЫХ ФНС / КОНКУРЕНТОВ ====================

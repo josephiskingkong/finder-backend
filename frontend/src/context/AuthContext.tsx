@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { api } from '../api/client'
+import { api, tryRefreshToken } from '../api/client'
 
 interface User {
   id: string
@@ -32,23 +32,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken')
-    if (token) {
-      api.get<User>('/auth/me')
-        .then(setUser)
-        .catch((err: any) => {
-          // Чистим сессию ТОЛЬКО при явном отказе авторизации (401/403).
-          // Сетевая ошибка (ECONNREFUSED, таймаут, NETWORK_ERROR) — сервер просто не запущен,
-          // не нужно выбрасывать пользователя из аккаунта.
-          const status = err?.status ?? err?.response?.status
-          const isNetworkError = !status || err?.message?.includes('NETWORK') || err?.message?.includes('fetch')
-          if ((status === 401 || status === 403) && !isNetworkError) {
+    if (!token) {
+      // Нет access token — пробуем refresh если есть refresh token
+      const rt = localStorage.getItem('refreshToken')
+      if (rt) {
+        tryRefreshToken().then(ok => {
+          if (ok) {
+            api.get<User>('/auth/me').then(setUser).catch(() => {}).finally(() => setLoading(false))
+          } else {
             localStorage.clear()
+            setLoading(false)
           }
         })
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+      } else {
+        setLoading(false)
+      }
+      return
     }
+    api.get<User>('/auth/me')
+      .then(setUser)
+      .catch(async (err: any) => {
+        const status = err?.status ?? err?.response?.status
+        const isNetworkError = !status || err?.message?.includes('NETWORK') || err?.message?.includes('fetch')
+        if ((status === 401 || status === 403) && !isNetworkError) {
+          // Access token истёк — пробуем обновить
+          const ok = await tryRefreshToken().catch(() => false)
+          if (ok) {
+            const u = await api.get<User>('/auth/me').catch(() => null)
+            if (u) { setUser(u); return }
+          }
+          localStorage.clear()
+        }
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   const login = async (email: string, password: string) => {

@@ -10,6 +10,7 @@ import Chat from './pages/Chat'
 import RoadmapPage from './pages/Roadmap'
 import MarketPage from './pages/Market'
 import InterviewPage from './pages/Interview'
+import ProjectDashboard from './pages/ProjectDashboard'
 import Admin from './pages/Admin'
 import Pricing from './pages/Pricing'
 
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/roadmap" element={<RoadmapPage />} />
               <Route path="/market" element={<MarketPage />} />
               <Route path="/interview" element={<InterviewPage />} />
+              <Route path="/project" element={<ProjectDashboard />} />
               <Route path="/pricing" element={<Pricing />} />
               {/* /admin доступен только для USER.role === 'ADMIN', остальные → /dashboard */}
               <Route element={<AdminRoute />}>

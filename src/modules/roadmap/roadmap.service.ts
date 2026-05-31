@@ -4,6 +4,7 @@ import { sendChat, sendChatJSON } from '../../services/ai.service';
 import type { ChatMessage } from '../../services/openai.service';
 import { SYSTEM_PROMPT_ROADMAP_GENERATION, SYSTEM_PROMPT_STEP_ANALYSIS, SYSTEM_PROMPT_EXTRACT_BUSINESS_INFO } from '../../prompts/system';
 import { ReportStepInput } from './roadmap.validation';
+import { generateCanvas } from '../canvas/canvas.service';
 // RoadmapPhase определён в Prisma schema
 
 interface GeneratedStep {
@@ -313,6 +314,11 @@ export async function reportStep(userId: string, stepId: string, input: ReportSt
     where: { id: step.roadmap.id },
     include: { steps: { orderBy: { order: 'asc' } } },
   });
+
+  // Асинхронно обновляем канвас бизнес-модели после завершения шага (не блокируем ответ)
+  if (input.success) {
+    generateCanvas(userId, step.roadmap.businessId, 'roadmap_step').catch(() => {});
+  }
 
   return {
     step: updatedStep,

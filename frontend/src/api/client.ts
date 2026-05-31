@@ -59,6 +59,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return json.data ?? json;
 }
 
+export async function tryRefreshToken(): Promise<boolean> {
+  return tryRefresh()
+}
+
 async function tryRefresh(): Promise<boolean> {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) return false;
@@ -97,15 +101,41 @@ export function streamMessage(
   onDone: (err?: string, meta?: Record<string, any>) => void,
   onCompetitors?: (data: unknown) => void,
 ) {
-  const token = localStorage.getItem('accessToken');
-  fetch(`${BASE}/chat/message`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  }).then(async (res) => {
+  (async () => {
+    const doFetch = (tok: string | null) => fetch(`${BASE}/chat/message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+
+    let res: Response;
+    try {
+      res = await doFetch(localStorage.getItem('accessToken'));
+    } catch {
+      onDone();
+      return;
+    }
+
+    // Если access token истёк — пробуем refresh и повторяем запрос
+    if (res.status === 401) {
+      const ok = await tryRefresh().catch(() => false);
+      if (ok) {
+        try {
+          res = await doFetch(localStorage.getItem('accessToken'));
+        } catch {
+          onDone();
+          return;
+        }
+      } else {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
+    }
+
     if (!res.ok || !res.body) {
       let msg = 'Ошибка запроса';
       let meta: Record<string, any> | undefined;
@@ -118,34 +148,34 @@ export function streamMessage(
       onDone(msg, meta);
       return;
     }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const payload = line.slice(6);
-          if (payload === '[DONE]') {
-            onDone();
-            return;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const payload = line.slice(6);
+            if (payload === '[DONE]') { onDone(); return; }
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.content) onChunk(parsed.content);
+              if (parsed.competitors && onCompetitors) onCompetitors(parsed.competitors);
+            } catch {}
           }
-          try {
-            const parsed = JSON.parse(payload);
-            if (parsed.content) onChunk(parsed.content);
-            if (parsed.competitors && onCompetitors) onCompetitors(parsed.competitors);
-          } catch {}
         }
       }
+      onDone();
+    } catch (err) {
+      console.error('[streamMessage] read error:', err);
+      onDone();
     }
-    onDone();
-  }).catch((err) => {
-    console.error('[streamMessage] fetch error:', err);
-    onDone();
-  });
+  })();
 }

@@ -18,6 +18,7 @@ import filesRoutes from './modules/files/files.routes';
 import aiRoutes from './modules/ai/ai.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import interviewRoutes from './modules/interview/interview.routes';
+import canvasRoutes from './modules/canvas/canvas.routes';
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/files', filesRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/api/canvas', canvasRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
