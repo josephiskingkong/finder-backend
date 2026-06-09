@@ -15,11 +15,11 @@ export const config = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     /// Основная модель — для лёгких диалоговых вопросов в PREMIUM tier.
-    model: process.env.OPENAI_MODEL || 'gpt-4o',
+    model: process.env.OPENAI_MODEL || 'gpt-5.4-mini',
     /// Мощная модель — для тяжёлых задач в PREMIUM tier: анализ рынка, юридика, конкуренты, роадмап.
-    powerModel: process.env.OPENAI_POWER_MODEL || 'gpt-4.5',
+    powerModel: process.env.OPENAI_POWER_MODEL || 'gpt-5.4-mini',
     /// Лёгкая модель — для быстрых диалоговых вопросов в PREMIUM tier (экономия квоты).
-    lightModel: process.env.OPENAI_LIGHT_MODEL || 'gpt-4.5-mini',
+    lightModel: process.env.OPENAI_LIGHT_MODEL || 'gpt-5.4-nano',
     /// Дешёвая модель для служебных задач: rolling summary, извлечение бизнес-инфо и т.п.
     /// `gpt-4o-mini` примерно в 30 раз дешевле `gpt-4o` и для конспектирования качества хватает.
     cheapModel: process.env.OPENAI_CHEAP_MODEL || 'gpt-4o-mini',

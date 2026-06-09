@@ -19,6 +19,7 @@ import aiRoutes from './modules/ai/ai.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import interviewRoutes from './modules/interview/interview.routes';
 import canvasRoutes from './modules/canvas/canvas.routes';
+import marketRoutes from './modules/market/market.routes';
 
 const app = express();
 
@@ -58,11 +59,20 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/canvas', canvasRoutes);
+app.use('/api/market', marketRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// ==================== Статическая раздача frontend ====================
+if (config.nodeEnv === 'production') {
+  app.use(express.static('frontend/dist'));
+  app.get('/{*path}', (_req, res) => {
+    res.sendFile('frontend/dist/index.html', { root: '.' });
+  });
+}
 
 // ==================== Error handling ====================
 app.use(errorHandler);

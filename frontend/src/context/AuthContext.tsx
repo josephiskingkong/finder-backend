@@ -32,37 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken')
-    if (!token) {
-      // Нет access token — пробуем refresh если есть refresh token
-      const rt = localStorage.getItem('refreshToken')
-      if (rt) {
-        tryRefreshToken().then(ok => {
-          if (ok) {
-            api.get<User>('/auth/me').then(setUser).catch(() => {}).finally(() => setLoading(false))
-          } else {
-            localStorage.clear()
-            setLoading(false)
-          }
-        })
-      } else {
-        setLoading(false)
-      }
+    const rt = localStorage.getItem('refreshToken')
+
+    if (!token && !rt) {
+      setLoading(false)
       return
     }
+
+    // client.ts автоматически делает refresh при 401 и повторяет запрос.
+    // Поэтому просто вызываем /auth/me — всё остальное обработает client.
     api.get<User>('/auth/me')
       .then(setUser)
-      .catch(async (err: any) => {
-        const status = err?.status ?? err?.response?.status
-        const isNetworkError = !status || err?.message?.includes('NETWORK') || err?.message?.includes('fetch')
-        if ((status === 401 || status === 403) && !isNetworkError) {
-          // Access token истёк — пробуем обновить
-          const ok = await tryRefreshToken().catch(() => false)
-          if (ok) {
-            const u = await api.get<User>('/auth/me').catch(() => null)
-            if (u) { setUser(u); return }
-          }
+      .catch((err: any) => {
+        const status = err?.status
+        // Только явный 401/403 от сервера (не сетевая ошибка) — чистим сессию
+        if (status === 401 || status === 403) {
           localStorage.clear()
         }
+        // Сетевая ошибка (503) — не чистим, пользователь остаётся залогиненным
       })
       .finally(() => setLoading(false))
   }, [])

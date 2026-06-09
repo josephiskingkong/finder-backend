@@ -30,20 +30,27 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (res.status === 401) {
+    let refreshed = false;
     try {
-      const refreshed = await tryRefresh();
-      if (refreshed) {
-        headers.Authorization = `Bearer ${localStorage.getItem('accessToken')}`;
-        const retry = await fetch(`${BASE}${path}`, { ...options, headers });
-        if (!retry.ok) throw new ApiError('Ошибка запроса', retry.status);
-        return retry.json();
-      }
+      refreshed = await tryRefresh();
     } catch (refreshErr: any) {
-      // Network error — сервер недоступен, не выбрасываем из аккаунта
-      if (refreshErr?.message === 'NETWORK_ERROR') {
-        throw new ApiError('Сервер недоступен, попробуйте позже', 503);
-      }
+      // Сетевая ошибка при refresh — сервер недоступен, не выбрасываем из аккаунта
+      throw new ApiError('Сервер недоступен, попробуйте позже', 503);
     }
+
+    if (refreshed) {
+      headers.Authorization = `Bearer ${localStorage.getItem('accessToken')}`;
+      const retry = await fetch(`${BASE}${path}`, { ...options, headers });
+      if (retry.status === 204) return undefined as T;
+      if (!retry.ok) {
+        const data = await retry.json().catch(() => ({}));
+        throw new ApiError(data.error || 'Ошибка запроса', retry.status);
+      }
+      const json = await retry.json();
+      return json.data ?? json;
+    }
+
+    // Refresh token невалиден — только тогда чистим и редиректим
     localStorage.clear();
     window.location.href = '/login';
     throw new ApiError('Сессия истекла', 401);

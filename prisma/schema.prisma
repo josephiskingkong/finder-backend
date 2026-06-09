@@ -147,6 +147,7 @@ model Business {
   files    Attachment[]
   interviewHypotheses Hypothesis[] // Гипотезы для проверки на интервью
   canvas   BusinessCanvas?
+  marketAnalysis MarketAnalysis?
 
   @@map("businesses")
 }
@@ -401,6 +402,33 @@ model BusinessCanvas {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@map("business_canvas")
+}
+
+/// Анализ рынка: размеры рынка (TAM/SAM/SOM) и модели монетизации.
+/// Генерируется ИИ по требованию пользователя со страницы «Рынок».
+model MarketAnalysis {
+  id         String   @id @default(uuid())
+  businessId String   @unique @map("business_id")
+
+  /// JSON: { value: number; unit: 'RUB'|'USD'; basis: string; description: string }
+  tam        String?
+  sam        String?
+  som        String?
+
+  /// JSON-массив: [{ name, description, pricing, pros[], cons[], fit, recommendedFor }]
+  monetizationModels String? @map("monetization_models")
+
+  /// JSON-массив сегментов: [{ name, share, description, painPoints[], channels[] }]
+  segments   String?
+
+  lastGeneratedAt DateTime? @map("last_generated_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("market_analysis")
 }
 
 // ==================== КЭШ ДАННЫХ ФНС / КОНКУРЕНТОВ ====================
