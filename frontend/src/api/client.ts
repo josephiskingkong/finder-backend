@@ -29,7 +29,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new ApiError('Сервер недоступен, попробуйте позже', 503);
   }
 
-  if (res.status === 401) {
+  // Для эндпоинтов авторизации 401 — это неверные данные, а не истёкшая сессия:
+  // пропускаем логику refresh и отдаём реальную ошибку API ниже ("Неверный email или пароль").
+  const isAuthEndpoint = path.startsWith('/auth/login') || path.startsWith('/auth/register');
+
+  if (res.status === 401 && !isAuthEndpoint) {
     let refreshed = false;
     try {
       refreshed = await tryRefresh();

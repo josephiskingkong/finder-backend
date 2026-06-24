@@ -23,6 +23,10 @@ import marketRoutes from './modules/market/market.routes';
 
 const app = express();
 
+// За обратным прокси (nginx) доверяем первому хопу, иначе express-rate-limit
+// падает на заголовке X-Forwarded-For и неверно определяет IP клиента.
+app.set('trust proxy', 1);
+
 // ==================== Middleware ====================
 app.use(helmet());
 app.use(cors({
