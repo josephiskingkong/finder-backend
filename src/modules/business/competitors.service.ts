@@ -100,14 +100,14 @@ export async function analyzeCompetitorsForBusiness(
   // Шаг 1: LLM определяет ОКВЭД-коды — единственное что мы просим у неё.
   let okvedCodes: string[] = [];
   try {
-    // OKVED классификация ВСЕГДА через PREMIUM (OpenAI) — GigaChat ненадёжен для JSON.
-    // Это дешёвый внутренний вызов, не зависящий от тарифа пользователя.
+    // OKVED классификация идёт через провайдера JSON-задач по умолчанию
+    // (config.ai.jsonProvider — GigaChat) с автоматическим fallback на OpenAI
+    // при невалидном JSON. Это дешёвый внутренний вызов, не зависящий от тарифа.
     const classified = await sendChatJSON<OkvedClassification>(
       [
         { role: 'system', content: SYSTEM_PROMPT_OKVED_CLASSIFY },
         { role: 'user', content: briefParts.join('\n') },
       ],
-      { tier: 'PREMIUM' },
     );
     okvedCodes = (classified.okved || [])
       .filter(c => typeof c === 'string' && /^\d{2}(\.\d{1,2}){0,2}$/.test(c.trim()))

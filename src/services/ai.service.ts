@@ -24,7 +24,8 @@ export interface AiTierDescriptor {
   model: string;
   description: string;
   /// Можно ли использовать тариф для генерации структурированного JSON (роадмапы и т.п.).
-  /// PLUS пока не гарантирует строгий response_format, поэтому JSON-ветка всегда идёт через PREMIUM.
+  /// Фактический провайдер JSON-задач задаётся глобально через config.ai.jsonProvider
+  /// (по умолчанию GigaChat с fallback на OpenAI) — см. sendChatJSON.
   supportsJson: boolean;
   badge?: 'recommended' | 'beta';
 }
@@ -116,14 +117,21 @@ export async function streamChat(messages: ChatMessage[], res: Response, options
 }
 
 /**
- * JSON-ответы (роадмапы, извлечение данных и т.п.).
- * По умолчанию PREMIUM (OpenAI со строгим response_format).
- * Если пользователь выбрал PLUS — пробуем GigaChat (rawSendChat без audit),
- * fallback на OpenAI при ошибке парсинга.
+ * JSON-ответы (Остервальдер/канвас, анализ рынка, конкуренты, роадмапы, гипотезы,
+ * извлечение данных и т.п.).
+ *
+ * Провайдер JSON-задач определяется глобально через config.ai.jsonProvider
+ * (env AI_JSON_PROVIDER), а НЕ тарифом чата:
+ *  - 'gigachat' (по умолчанию) — пробуем Сбер GigaChat (rawSendChat без audit),
+ *    при невалидном/обрезанном JSON автоматически откатываемся на OpenAI;
+ *  - 'openai' — сразу OpenAI со строгим response_format.
+ * Явно выбранный tier PLUS тоже всегда означает GigaChat.
  */
 export async function sendChatJSON<T>(messages: ChatMessage[], options: SendChatOptions = {}): Promise<T> {
   const tier = options.tier || DEFAULT_AI_TIER;
-  if (tier === 'PLUS') {
+  const preferGigachat = config.ai.jsonProvider === 'gigachat' || tier === 'PLUS';
+
+  if (preferGigachat) {
     try {
       // Используем rawSendChat: audit/repair ненужны для JSON-задач и только ломают структуру.
       // Лимит 4096 — GigaChat обрезал JSON при 2048.

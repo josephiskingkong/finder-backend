@@ -53,4 +53,13 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },
+
+  ai: {
+    /// Провайдер для структурированных JSON-задач: Остервальдер/бизнес-канвас,
+    /// анализ рынка, анализ конкурентов, роадмап, гипотезы интервью.
+    /// 'gigachat' (по умолчанию) — Сбер GigaChat с автоматическим fallback на OpenAI,
+    /// если Сбер вернёт невалидный JSON. 'openai' — сразу OpenAI.
+    /// Переключается без правок кода через env AI_JSON_PROVIDER.
+    jsonProvider: (process.env.AI_JSON_PROVIDER || 'gigachat') as 'gigachat' | 'openai',
+  },
 } as const;
